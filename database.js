@@ -200,10 +200,27 @@ CREATE TABLE IF NOT EXISTS forum_comment_likes (
   FOREIGN KEY(comment_id) REFERENCES forum_comments(id),
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  color TEXT DEFAULT '#dc2626',
+  is_system INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS forum_tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  forum_id INTEGER,
+  tag_id INTEGER,
+  UNIQUE(forum_id, tag_id),
+  FOREIGN KEY(forum_id) REFERENCES forums(id),
+  FOREIGN KEY(tag_id) REFERENCES tags(id)
+);
 `);
 
 // image_url kolonu book_pages tablosuna ekle (tablo zaten varsa ALTER TABLE ile)
 try { db.exec("ALTER TABLE book_pages ADD COLUMN image_url TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE forums ADD COLUMN custom_tags TEXT DEFAULT ''"); } catch {}
 
 const levelCount = db.prepare('SELECT COUNT(*) as c FROM levels').get().c;
 if (levelCount === 0) {
@@ -213,6 +230,19 @@ if (levelCount === 0) {
   insertLevel.run('Katkıcı', 'fas fa-pen', '#3b82f6', 15, 3, 30, 3);
   insertLevel.run('Uzman', 'fas fa-crown', '#8b5cf6', 30, 5, 60, 4);
   insertLevel.run('Efsane', 'fas fa-dragon', '#dc2626', 50, 10, 100, 5);
+}
+
+const tagCount = db.prepare('SELECT COUNT(*) as c FROM tags').get().c;
+if (tagCount === 0) {
+  const insertTag = db.prepare('INSERT INTO tags (name, color, is_system) VALUES (?,?,1)');
+  insertTag.run('Genel', '#3b82f6');
+  insertTag.run('Soru', '#f97316');
+  insertTag.run('Tartışma', '#8b5cf6');
+  insertTag.run('Haber', '#dc2626');
+  insertTag.run('Yardım', '#10b981');
+  insertTag.run('Teknoloji', '#06b6d4');
+  insertTag.run('Sanat', '#ec4899');
+  insertTag.run('Edebiyat', '#6366f1');
 }
 
 const adminPw = db.prepare('SELECT value FROM settings WHERE key=?').get('admin_password');

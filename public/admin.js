@@ -96,7 +96,7 @@ function loadSection(section) {
   currentSection = section;
   const main = $('#admin-main');
   main.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
-  const map = { users: renderUsers, forums: renderForums, books: renderBooks, groups: renderGroups, levels: renderLevels, logs: renderLogs, settings: renderSettings };
+  const map = { users: renderUsers, forums: renderForums, books: renderBooks, groups: renderGroups, levels: renderLevels, tags: renderTags, logs: renderLogs, settings: renderSettings };
   if (map[section]) map[section](main);
 }
 
@@ -239,11 +239,11 @@ function showBanModal(userId) {
 
 async function renderForums(main) {
   let forums = [];
-  try { forums = await adminApi('/forums'); } catch (e) { main.innerHTML = `<div class="page-title">Forumlar</div><p style="color:var(--accent-red2)">${e.message}</p>`; return; }
+  try { forums = await adminApi('/forums'); } catch (e) { main.innerHTML = `<div class="page-title">Konular</div><p style="color:var(--accent-red2)">${e.message}</p>`; return; }
 
   main.innerHTML = `
     <div class="section-bar">
-      <div class="page-title" style="margin:0">Forumlar <span style="font-size:14px;color:var(--text-muted)">(${forums.length})</span></div>
+      <div class="page-title" style="margin:0">Konular <span style="font-size:14px;color:var(--text-muted)">(${forums.length})</span></div>
       <input type="text" id="forum-search" placeholder="Ara..." style="max-width:220px" />
     </div>
     <div class="card">
@@ -264,7 +264,7 @@ async function renderForums(main) {
 
 function renderForumsTable(forums) {
   const tbody = $('#forums-tbody'); if (!tbody) return;
-  if (!forums.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">Forum yok</td></tr>'; return; }
+  if (!forums.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px">Konu yok</td></tr>'; return; }
   tbody.innerHTML = forums.map(f => `<tr>
     <td style="color:var(--text-muted)">#${f.id}</td>
     <td><a href="/forum/${escHtml(f.slug)}" target="_blank" style="color:var(--accent-red2)">${escHtml(f.title.substring(0, 60))}${f.title.length > 60 ? '...' : ''}</a></td>
@@ -286,7 +286,7 @@ function renderForumsTable(forums) {
       const id = edit.dataset.id;
       const forum = forums.find(f => f.id == id);
       if (!forum) return;
-      showModal('Forum Düzenle', `
+      showModal('Konu Düzenle', `
         <div class="form-group"><label>Başlık</label><input id="ef-title" type="text" value="${escHtml(forum.title)}" /></div>
         <div class="form-group"><label>İçerik</label><textarea id="ef-content" rows="8">${escHtml(forum.content)}</textarea></div>
         <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ef-comments" ${forum.allow_comments ? 'checked' : ''} /> Yorumlara izin ver</label></div>
@@ -296,13 +296,13 @@ function renderForumsTable(forums) {
       $('#ef-submit').addEventListener('click', async () => {
         try {
           await adminApi('/forum/' + id, { method: 'PUT', body: JSON.stringify({ title: $('#ef-title').value.trim(), content: $('#ef-content').value.trim(), allow_comments: $('#ef-comments').checked }) });
-          toast('Forum güncellendi'); hideModal(); loadSection('forums');
+          toast('Konu güncellendi'); hideModal(); loadSection('forums');
         } catch (e) { $('#ef-error').textContent = e.message; }
       });
     }
     if (del) {
-      if (!confirm('Forum silinsin mi?')) return;
-      try { await adminApi('/forum/' + del.dataset.id, { method: 'DELETE' }); toast('Forum silindi'); loadSection('forums'); } catch (e) { toast(e.message, 'error'); }
+      if (!confirm('Konu silinsin mi?')) return;
+      try { await adminApi('/forum/' + del.dataset.id, { method: 'DELETE' }); toast('Konu silindi'); loadSection('forums'); } catch (e) { toast(e.message, 'error'); }
     }
   });
 }
@@ -485,6 +485,92 @@ function showLevelModal(level, cb) {
       else await adminApi('/levels', { method: 'POST', body: JSON.stringify(body) });
       toast(level ? 'Seviye güncellendi' : 'Seviye eklendi'); hideModal(); cb && cb();
     } catch (e) { $('#lv-error').textContent = e.message; }
+  });
+}
+
+async function renderTags(main) {
+  let tags = [];
+  try { tags = await adminApi('/tags'); } catch (e) { main.innerHTML = `<p style="color:var(--accent-red2)">${e.message}</p>`; return; }
+
+  main.innerHTML = `
+    <div class="section-bar">
+      <div class="page-title" style="margin:0">Konu Türleri</div>
+      <button class="btn btn-primary btn-sm" id="add-tag-btn"><i class="fas fa-plus"></i> Ekle</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>İsim</th><th>Renk</th><th>Kullanım</th><th>İşlem</th></tr></thead>
+          <tbody id="tags-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+
+  renderTagsTable(tags);
+
+  $('#add-tag-btn').addEventListener('click', () => showTagModal(null, () => loadSection('tags')));
+}
+
+function renderTagsTable(tags) {
+  const tbody = $('#tags-tbody'); if (!tbody) return;
+  if (!tags.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px">Tag yok</td></tr>'; return; }
+  tbody.innerHTML = tags.map(t => `<tr>
+    <td style="color:var(--text-muted)">#${t.id}</td>
+    <td><span class="badge" style="background:${escHtml(t.color)};padding:4px 10px;border-radius:4px">${escHtml(t.name)}</span></td>
+    <td><div style="display:flex;align-items:center;gap:8px"><div style="width:22px;height:22px;border-radius:50%;background:${escHtml(t.color)}"></div>${escHtml(t.color)}</div></td>
+    <td>${t.is_system ? '<span class="badge badge-green">Sistem</span>' : '<span class="badge badge-gray">Özel</span>'}</td>
+    <td>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-outline btn-sm edit-tag-btn" data-id="${t.id}"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-danger btn-sm del-tag-btn" data-id="${t.id}"><i class="fas fa-trash"></i></button>
+      </div>
+    </td>
+  </tr>`).join('');
+
+  tbody.addEventListener('click', async e => {
+    const edit = e.target.closest('.edit-tag-btn');
+    const del = e.target.closest('.del-tag-btn');
+    if (edit) {
+      const tag = tags.find(t => t.id == edit.dataset.id);
+      if (tag) showTagModal(tag, () => loadSection('tags'));
+    }
+    if (del) {
+      if (!confirm('Tag silinsin mi?')) return;
+      try { await adminApi('/tag/' + del.dataset.id, { method: 'DELETE' }); toast('Tag silindi'); loadSection('tags'); } catch (e) { toast(e.message, 'error'); }
+    }
+  });
+}
+
+function showTagModal(tag, cb) {
+  showModal(tag ? 'Tag Düzenle' : 'Yeni Tag', `
+    <div class="form-row">
+      <div class="form-group"><label>İsim</label><input id="tag-name" type="text" value="${tag ? escHtml(tag.name) : ''}" /></div>
+      <div class="form-group"><label>Renk</label><input id="tag-color" type="color" value="${tag ? tag.color : '#dc2626'}" style="height:38px;cursor:pointer" /></div>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:var(--bg-card2);border-radius:8px;display:flex;align-items:center;gap:10px">
+      <span id="tag-preview" class="badge" style="background:${tag ? tag.color : '#dc2626'};padding:4px 10px;border-radius:4px;font-size:13px">${tag ? tag.name : 'Önizleme'}</span>
+    </div>
+    <button class="btn btn-primary" id="tag-submit" style="width:100%;margin-top:16px">${tag ? 'Güncelle' : 'Ekle'}</button>
+    <div id="tag-error" class="form-error" style="margin-top:8px"></div>
+  `);
+
+  ['tag-name', 'tag-color'].forEach(id => {
+    $('#' + id)?.addEventListener('input', () => {
+      const name = $('#tag-name').value; const color = $('#tag-color').value;
+      const preview = $('#tag-preview');
+      preview.textContent = name || 'Önizleme';
+      preview.style.background = color;
+    });
+  });
+
+  $('#tag-submit').addEventListener('click', async () => {
+    const body = { name: $('#tag-name').value.trim(), color: $('#tag-color').value };
+    if (!body.name) { $('#tag-error').textContent = 'İsim zorunlu'; return; }
+    try {
+      if (tag) await adminApi('/tag/' + tag.id, { method: 'PUT', body: JSON.stringify(body) });
+      else await adminApi('/tags', { method: 'POST', body: JSON.stringify(body) });
+      toast(tag ? 'Tag güncellendi' : 'Tag eklendi'); hideModal(); cb && cb();
+    } catch (e) { $('#tag-error').textContent = e.message; }
   });
 }
 

@@ -184,7 +184,7 @@ async function renderHome(app) {
         <div class="hero-title">DEMLİK</div>
         <p class="hero-subtitle">Fikirlerin buluştuğu, hikayelerin yeşerdiği topluluk platformu.</p>
         <div class="hero-buttons">
-          <a href="/forum" data-link class="btn btn-primary btn-lg"><i class="fas fa-comments"></i> Forumlara Gir</a>
+          <a href="/forum" data-link class="btn btn-primary btn-lg"><i class="fas fa-comments"></i> Konulara Gir</a>
           <a href="/kitaplar" data-link class="btn btn-outline btn-lg"><i class="fas fa-book-open"></i> Kitapları Keşfet</a>
         </div>
       </div>
@@ -192,7 +192,7 @@ async function renderHome(app) {
     <div class="container page">
       <div class="section">
         <div class="section-header">
-          <div class="section-title"><div class="section-title-bar"></div>Son Forumlar</div>
+          <div class="section-title"><div class="section-title-bar"></div>Son Konular</div>
           <a href="/forum" data-link class="btn btn-ghost btn-sm">Tümü <i class="fas fa-arrow-right"></i></a>
         </div>
         <div id="home-forums"><div class="loading-center"><div class="spinner"></div></div></div>
@@ -222,14 +222,14 @@ async function renderHome(app) {
 }
 
 async function renderForumList(app) {
-  document.title = 'Forumlar - Demlik';
+  document.title = 'Konular - Demlik';
   app.innerHTML = `
     <div class="container page">
       <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-        <div><div class="page-title">Forumlar</div><div class="page-subtitle">Toplulukla fikir paylaş</div></div>
-        ${currentUser ? `<button class="btn btn-primary" id="new-forum-btn"><i class="fas fa-plus"></i> Yeni Forum</button>` : ''}
+        <div><div class="page-title">Konular</div><div class="page-subtitle">Toplulukla fikir paylaş</div></div>
+        ${currentUser ? `<button class="btn btn-primary" id="new-forum-btn"><i class="fas fa-plus"></i> Yeni Konu Aç</button>` : ''}
       </div>
-      <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="forum-search" placeholder="Forum ara..." /></div>
+      <div class="search-bar"><i class="fas fa-search"></i><input type="text" id="forum-search" placeholder="Konu ara..." /></div>
       <div id="forums-list"><div class="loading-center"><div class="spinner"></div></div></div>
     </div>`;
 
@@ -249,7 +249,7 @@ async function renderForumList(app) {
 function renderForumListItems(forums) {
   const el = $('#forums-list');
   if (!el) return;
-  if (!forums.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>Forum bulunamadı.</p></div>'; return; }
+  if (!forums.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>Konu bulunamadı.</p></div>'; return; }
   el.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${forums.map(f => forumCardHTML(f)).join('')}</div>`;
 }
 
@@ -273,9 +273,16 @@ function forumCardHTML(f) {
 }
 
 function showNewForumModal(existing = null) {
-  showModal(existing ? 'Forumu Düzenle' : 'Yeni Forum', `
-    <div class="form-group"><label>Başlık</label><input id="fm-title" type="text" placeholder="Forum başlığı" value="${existing ? escHtml(existing.title) : ''}" /></div>
+  showModal(existing ? 'Konuyu Düzenle' : 'Yeni Konu Aç', `
+    <div class="form-group"><label>Başlık</label><input id="fm-title" type="text" placeholder="Konu başlığı" value="${existing ? escHtml(existing.title) : ''}" /></div>
     <div class="form-group"><label>İçerik</label><textarea id="fm-content" rows="8" placeholder="Yazınızı buraya girin...">${existing ? escHtml(existing.content) : ''}</textarea></div>
+    <div class="form-group">
+      <label>Konu Türleri</label>
+      <div id="fm-tags-loading" style="color:var(--text-muted);padding:8px">Yükleniyor...</div>
+      <div id="fm-tags-checkboxes" style="display:none;max-height:160px;overflow-y:auto;background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:10px;display:none"></div>
+      <div style="margin-top:8px"><small style="color:var(--text-muted)">veya virgülle ayırarak kendiniz ekleyin:</small></div>
+      <input type="text" id="fm-custom-tags" placeholder="Örn: bilim, siyaset, teknoloji" style="margin-top:4px" />
+    </div>
     <div class="form-group">
       <label>Banner Resim (opsiyonel)</label>
       <input type="file" id="fm-banner-file" accept="image/*" style="margin-bottom:8px" />
@@ -285,6 +292,34 @@ function showNewForumModal(existing = null) {
     <button class="btn btn-primary" id="fm-submit" style="width:100%">${existing ? 'Güncelle' : 'Yayınla'}</button>
     <div id="fm-error" class="form-error mt-4"></div>
   `);
+
+  api('/tags').then(tags => {
+    const container = $('#fm-tags-checkboxes');
+    const loading = $('#fm-tags-loading');
+    if (!container || !loading) return;
+    loading.style.display = 'none';
+    container.style.display = 'block';
+    container.innerHTML = tags.map(t => `
+      <label class="checkbox-label" style="margin:4px 0;padding:4px;cursor:pointer">
+        <input type="checkbox" class="fm-tag-check" value="${t.id}" />
+        <span class="badge" style="background:${escHtml(t.color)};padding:3px 8px;border-radius:4px;margin-left:6px">${escHtml(t.name)}</span>
+      </label>
+    `).join('');
+    
+    if (existing) {
+      api('/forum/' + existing.slug + '/tags').then(data => {
+        data.systemTags.forEach(t => {
+          const cb = container.querySelector(`input[value="${t.id}"]`);
+          if (cb) cb.checked = true;
+        });
+        if (data.customTags.length > 0) {
+          $('#fm-custom-tags').value = data.customTags.join(', ');
+        }
+      }).catch(() => {});
+    }
+  }).catch(() => {
+    $('#fm-tags-loading').textContent = 'Tag yüklenemedi';
+  });
 
   $('#fm-banner-file').addEventListener('change', e => {
     const file = e.target.files[0];
@@ -301,6 +336,11 @@ function showNewForumModal(existing = null) {
     const title = $('#fm-title').value.trim();
     const content = $('#fm-content').value.trim();
     if (!title || !content) { $('#fm-error').textContent = 'Başlık ve içerik zorunlu'; return; }
+    
+    const tagIds = Array.from($$('.fm-tag-check:checked')).map(cb => parseInt(cb.value));
+    const customTagsInput = $('#fm-custom-tags').value.trim();
+    const customTags = customTagsInput ? customTagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+    
     try {
       let banner_image = existing ? (existing.banner_image || '') : '';
       const bannerFile = $('#fm-banner-file').files[0];
@@ -310,11 +350,11 @@ function showNewForumModal(existing = null) {
         banner_image = r.url;
       }
       if (existing) {
-        await api('/forum/' + existing.slug, { method: 'PUT', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked }) });
-        toast('Forum güncellendi');
+        await api('/forum/' + existing.slug, { method: 'PUT', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags }) });
+        toast('Konu güncellendi');
       } else {
-        const f = await api('/forums', { method: 'POST', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked }) });
-        toast('Forum oluşturuldu');
+        const f = await api('/forums', { method: 'POST', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags }) });
+        toast('Konu oluşturuldu');
         hideModal();
         navigate('/forum/' + f.slug);
         return;
