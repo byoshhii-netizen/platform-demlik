@@ -1,6 +1,40 @@
 ﻿let currentUser = null;
 let currentToken = localStorage.getItem('token');
 
+const SITE_URL = 'https://demlikforum.up.railway.app';
+
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return document.querySelectorAll(sel); }
+
+function updatePageMeta(title, description, imageUrl) {
+  document.title = title;
+  let desc = document.querySelector('meta[name="description"]');
+  if (!desc) { desc = document.createElement('meta'); desc.setAttribute('name','description'); document.head.appendChild(desc); }
+  desc.setAttribute('content', description);
+
+  const ogFields = { 'og:title': title, 'og:description': description, 'og:image': imageUrl || (SITE_URL + '/demlik.png'), 'og:url': location.href };
+  Object.entries(ogFields).forEach(([prop, content]) => {
+    let el = document.querySelector(`meta[property="${prop}"]`);
+    if (!el) { el = document.createElement('meta'); el.setAttribute('property', prop); document.head.appendChild(el); }
+    el.setAttribute('content', content);
+  });
+
+  const twFields = { 'twitter:title': title, 'twitter:description': description, 'twitter:image': imageUrl || (SITE_URL + '/demlik.png') };
+  Object.entries(twFields).forEach(([name, content]) => {
+    let el = document.querySelector(`meta[name="${name}"]`);
+    if (!el) { el = document.createElement('meta'); el.setAttribute('name', name); document.head.appendChild(el); }
+    el.setAttribute('content', content);
+  });
+
+  let canonical = document.querySelector('link[rel="canonical"]');
+  if (!canonical) { canonical = document.createElement('link'); canonical.setAttribute('rel','canonical'); document.head.appendChild(canonical); }
+  canonical.setAttribute('href', location.href);
+
+  let ld = document.getElementById('page-jsonld');
+  if (!ld) { ld = document.createElement('script'); ld.type = 'application/ld+json'; ld.id = 'page-jsonld'; document.head.appendChild(ld); }
+  ld.textContent = '';
+}
+
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
 
@@ -177,7 +211,8 @@ $('#mobile-toggle').addEventListener('click', () => {
 });
 
 async function renderHome(app) {
-  document.title = 'Demlik Forum - Ana Sayfa';
+  document.title = 'Demlik – Topluluk Platformu';
+  updatePageMeta('Demlik – Topluluk Platformu', 'Fikirlerin buluştuğu, hikayelerin yeşerdiği topluluk platformu.', '');
   app.innerHTML = `
     <div class="hero">
       <div class="hero-content">
@@ -209,7 +244,7 @@ async function renderHome(app) {
   try {
     const forums = await api('/forums');
     const el = $('#home-forums');
-    if (!forums.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>Henüz forum yok.</p></div>'; }
+    if (!forums.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>Henüz konu yok.</p></div>'; }
     else el.innerHTML = forums.slice(0, 5).map(f => forumCardHTML(f)).join('');
   } catch {}
 
@@ -222,7 +257,8 @@ async function renderHome(app) {
 }
 
 async function renderForumList(app) {
-  document.title = 'Konular - Demlik';
+  document.title = 'Konular – Demlik';
+  updatePageMeta('Konular – Demlik', 'Toplulukla fikir paylaş, tartış, keşfet.', '');
   app.innerHTML = `
     <div class="container page">
       <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -371,11 +407,36 @@ async function renderForumDetail(app, slug) {
   let forum, liked = false, comments = [];
   try {
     forum = await api('/forum/' + slug);
-    document.title = forum.title + ' - Demlik';
+    document.title = forum.title + ' – Demlik';
+    updatePageMeta(
+      forum.title + ' – Demlik',
+      forum.content.substring(0, 155).replace(/\n/g, ' '),
+      forum.banner_image || ''
+    );
+
+    let ld = document.getElementById('page-jsonld');
+    if (!ld) { ld = document.createElement('script'); ld.type = 'application/ld+json'; ld.id = 'page-jsonld'; document.head.appendChild(ld); }
+    ld.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'DiscussionForumPosting',
+      'headline': forum.title,
+      'text': forum.content.substring(0, 500),
+      'url': SITE_URL + '/forum/' + forum.slug,
+      'datePublished': forum.created_at,
+      'dateModified': forum.updated_at || forum.created_at,
+      'author': { '@type': 'Person', 'name': forum.username || 'Anonim' },
+      'publisher': { '@type': 'Organization', 'name': 'Demlik', 'url': SITE_URL },
+      'interactionStatistic': [
+        { '@type': 'InteractionCounter', 'interactionType': 'https://schema.org/LikeAction', 'userInteractionCount': forum.like_count || 0 },
+        { '@type': 'InteractionCounter', 'interactionType': 'https://schema.org/CommentAction', 'userInteractionCount': forum.comment_count || 0 }
+      ],
+      ...(forum.banner_image ? { 'image': { '@type': 'ImageObject', 'url': forum.banner_image } } : {})
+    });
+
     try { await api('/forum/' + slug + '/view', { method: 'POST' }); } catch {}
     if (currentUser) { const l = await api('/forum/' + slug + '/liked'); liked = l.liked; }
     comments = await api('/forum/' + slug + '/comments');
-  } catch { app.innerHTML = '<div class="container page"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Forum bulunamadı.</p></div></div>'; return; }
+  } catch { app.innerHTML = '<div class="container page"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Konu bulunamadı.</p></div></div>'; return; }
 
   const isOwner = currentUser && currentUser.id === forum.user_id;
 
@@ -418,8 +479,8 @@ async function renderForumDetail(app, slug) {
   if (isOwner) {
     $('#edit-forum-btn').addEventListener('click', () => showNewForumModal(forum));
     $('#del-forum-btn').addEventListener('click', async () => {
-      if (!confirm('Forumu silmek istediğinize emin misiniz?')) return;
-      try { await api('/forum/' + slug, { method: 'DELETE' }); toast('Forum silindi'); navigate('/forum'); } catch (e) { toast(e.message, 'error'); }
+      if (!confirm('Konuyu silmek istediğinize emin misiniz?')) return;
+      try { await api('/forum/' + slug, { method: 'DELETE' }); toast('Konu silindi'); navigate('/forum'); } catch (e) { toast(e.message, 'error'); }
     });
   }
 
@@ -500,7 +561,8 @@ function commentHTML(c) {
 }
 
 async function renderBookList(app) {
-  document.title = 'Kitaplar - Demlik';
+  document.title = 'Kitaplar – Demlik';
+  updatePageMeta('Kitaplar – Demlik', 'Topluluğun yazdığı eserleri keşfet.', '');
   app.innerHTML = `
     <div class="container page">
       <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
@@ -595,7 +657,8 @@ async function renderBookDetail(app, slug) {
   try { data = await api('/book/' + slug); } catch { app.innerHTML = '<div class="container page"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Kitap bulunamadı.</p></div></div>'; return; }
 
   const { book, chapters, pages } = data;
-  document.title = book.title + ' - Demlik';
+  document.title = book.title + ' – Demlik';
+  updatePageMeta(book.title + ' – Demlik', book.preface ? book.preface.substring(0,155) : book.title + ' – Demlik\'te yayınlanan kitap.', book.cover_image || '');
   const isOwner = currentUser && currentUser.id === book.user_id;
 
   const unassigned = pages.filter(p => !p.chapter_id);
