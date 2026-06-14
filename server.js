@@ -133,7 +133,10 @@ function updateUserLevel(userId) {
   const levels = db.prepare('SELECT * FROM levels ORDER BY order_num ASC').all();
   let bestLevel = levels[0];
   for (const lv of levels) {
-    if (user.forum_count >= lv.min_forums && user.book_count >= lv.min_books && user.comment_count >= lv.min_comments) {
+    const minF = lv.min_forums >= 9999999 ? Infinity : lv.min_forums;
+    const minB = lv.min_books >= 9999999 ? Infinity : lv.min_books;
+    const minC = lv.min_comments >= 9999999 ? Infinity : lv.min_comments;
+    if (user.forum_count >= minF && user.book_count >= minB && user.comment_count >= minC) {
       bestLevel = lv;
     }
   }

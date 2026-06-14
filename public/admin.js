@@ -413,9 +413,9 @@ function renderLevelsTable(levels) {
     <td><i class="${escHtml(l.icon)}" style="color:${escHtml(l.color)};font-size:16px"></i></td>
     <td><strong style="color:${escHtml(l.color)}">${escHtml(l.name)}</strong></td>
     <td><div style="width:22px;height:22px;border-radius:50%;background:${escHtml(l.color)};display:inline-block"></div> ${escHtml(l.color)}</td>
-    <td>${l.min_forums}</td>
-    <td>${l.min_books}</td>
-    <td>${l.min_comments}</td>
+    <td>${l.min_forums >= 9999999 ? '∞' : l.min_forums}</td>
+    <td>${l.min_books >= 9999999 ? '∞' : l.min_books}</td>
+    <td>${l.min_comments >= 9999999 ? '∞' : l.min_comments}</td>
     <td>${l.order_num}</td>
     <td>
       <div style="display:flex;gap:4px">
@@ -439,17 +439,20 @@ function renderLevelsTable(levels) {
   });
 }
 
+const ALL_FA_ICONS = ['fas fa-star','fas fa-fire','fas fa-crown','fas fa-gem','fas fa-dragon','fas fa-shield-alt','fas fa-bolt','fas fa-seedling','fas fa-pen','fas fa-book','fas fa-trophy','fas fa-medal','fas fa-rocket','fas fa-skull','fas fa-chess-queen','fas fa-fist-raised','fas fa-leaf','fas fa-feather','fas fa-eye','fas fa-infinity','fas fa-atom','fas fa-brain','fas fa-heart','fas fa-sun','fas fa-moon','fas fa-dove','fas fa-paw','fas fa-anchor','fas fa-flask','fas fa-code','fas fa-terminal','fas fa-key','fas fa-hat-wizard','fas fa-sword','fas fa-magic','fas fa-wand-magic-sparkles','fas fa-chess-king','fas fa-chess-knight','fas fa-chess-rook','fas fa-chess-bishop','fas fa-chess-pawn','fas fa-ghost','fas fa-cat','fas fa-dog','fas fa-horse','fas fa-dragon','fas fa-crow','fas fa-spider','fas fa-fish','fas fa-frog','fas fa-hippo','fas fa-kiwi-bird','fas fa-otter','fas fa-mountain','fas fa-tree','fas fa-snowflake','fas fa-cloud','fas fa-cloud-bolt','fas fa-rainbow','fas fa-tornado','fas fa-wind','fas fa-fire-flame-curved','fas fa-volcano','fas fa-ice-cream','fas fa-pizza-slice','fas fa-coffee','fas fa-beer-mug-empty','fas fa-wine-glass','fas fa-mug-hot','fas fa-candy-cane','fas fa-lemon','fas fa-apple-whole','fas fa-carrot','fas fa-pepper-hot','fas fa-person','fas fa-person-running','fas fa-person-swimming','fas fa-person-biking','fas fa-person-skating','fas fa-person-skiing','fas fa-dumbbell','fas fa-baseball','fas fa-basketball','fas fa-football','fas fa-soccer-ball','fas fa-tennis-ball','fas fa-volleyball','fas fa-golf-ball-tee','fas fa-table-tennis-paddle-ball','fas fa-gamepad','fas fa-dice','fas fa-dice-d6','fas fa-dice-d20','fas fa-puzzle-piece','fas fa-chess','fas fa-guitar','fas fa-music','fas fa-headphones','fas fa-microphone','fas fa-drum','fas fa-piano','fas fa-trumpet','fas fa-violin','fas fa-palette','fas fa-paintbrush','fas fa-pencil','fas fa-eraser','fas fa-scissors','fas fa-ruler','fas fa-compass','fas fa-glasses','fas fa-binoculars','fas fa-telescope','fas fa-microscope','fas fa-flask-vial','fas fa-dna','fas fa-bacteria','fas fa-virus','fas fa-capsules','fas fa-pills','fas fa-syringe','fas fa-stethoscope','fas fa-heartbeat','fas fa-hospital','fas fa-cross','fas fa-hands-praying','fas fa-place-of-worship','fas fa-moon','fas fa-star-and-crescent','fas fa-yin-yang','fas fa-om','fas fa-khanda','fas fa-menorah','fas fa-torah','fas fa-church','fas fa-mosque','fas fa-synagogue','fas fa-robot','fas fa-microchip','fas fa-cpu','fas fa-laptop','fas fa-mobile','fas fa-tablet','fas fa-desktop','fas fa-keyboard','fas fa-mouse','fas fa-printer','fas fa-camera','fas fa-video','fas fa-tv','fas fa-radio','fas fa-satellite','fas fa-wifi','fas fa-signal','fas fa-bluetooth','fas fa-battery-full','fas fa-plug','fas fa-lightbulb','fas fa-flashlight','fas fa-magnifying-glass','fas fa-fingerprint','fas fa-lock','fas fa-unlock','fas fa-shield','fas fa-user-secret','fas fa-mask','fas fa-eye-slash','fas fa-user-ninja','fas fa-car','fas fa-truck','fas fa-bicycle','fas fa-motorcycle','fas fa-plane','fas fa-ship','fas fa-train','fas fa-bus','fas fa-helicopter','fas fa-rocket','fas fa-space-shuttle','fas fa-satellite-dish','fas fa-globe','fas fa-map','fas fa-location-dot','fas fa-compass-drafting','fas fa-flag','fas fa-flag-usa','fas fa-building','fas fa-house','fas fa-city','fas fa-bridge','fas fa-monument','fas fa-landmark','fas fa-university','fas fa-school','fas fa-store','fas fa-warehouse','fas fa-industry','fas fa-hammer','fas fa-wrench','fas fa-screwdriver','fas fa-gear','fas fa-gears','fas fa-toolbox','fas fa-box','fas fa-box-open','fas fa-boxes-stacked','fas fa-archive','fas fa-trash','fas fa-recycle','fas fa-coins','fas fa-dollar-sign','fas fa-euro-sign','fas fa-bitcoin-sign','fas fa-wallet','fas fa-credit-card','fas fa-money-bill','fas fa-piggy-bank','fas fa-chart-line','fas fa-chart-bar','fas fa-chart-pie','fas fa-trending-up','fas fa-arrow-up','fas fa-arrow-down','fas fa-arrows-alt','fas fa-expand','fas fa-compress','fas fa-plus','fas fa-minus','fas fa-times','fas fa-check','fas fa-question','fas fa-exclamation','fas fa-info','fas fa-bell','fas fa-envelope','fas fa-paper-plane','fas fa-comment','fas fa-comments','fas fa-quote-left','fas fa-quote-right','fas fa-hashtag','fas fa-at','fas fa-link','fas fa-share','fas fa-bookmark','fas fa-tag','fas fa-tags','fas fa-thumbs-up','fas fa-thumbs-down','fas fa-hand-peace','fas fa-hand-point-right','fas fa-handshake','fas fa-hands-helping','fas fa-clap','fas fa-award','fas fa-certificate','fas fa-graduation-cap','fas fa-user-graduate','fas fa-chalkboard-teacher','fas fa-book-open','fas fa-journal-whills','fas fa-scroll','fas fa-feather-alt','fas fa-quill','fas fa-pen-nib','fas fa-signature','fas fa-stamp','fas fa-newspaper','fas fa-photo-film','fas fa-film','fas fa-clapperboard','fas fa-masks-theater','fas fa-ticket','fas fa-calendar','fas fa-clock','fas fa-hourglass','fas fa-stopwatch','fas fa-timer','fas fa-history','fas fa-undo','fas fa-redo','fas fa-sync'];
+
 function showLevelModal(level, cb) {
+  const isInfMin = (val) => val === -1 || val === 9999999;
+  const infVal = (v) => v === -1 || v === 9999999 ? '∞' : v;
+
   showModal(level ? 'Seviye Düzenle' : 'Yeni Seviye', `
     <div class="form-row">
       <div class="form-group"><label>İsim</label><input id="lv-name" type="text" value="${level ? escHtml(level.name) : ''}" /></div>
       <div class="form-group">
         <label>İkon</label>
-        <input id="lv-icon" type="text" value="${level ? escHtml(level.icon) : 'fas fa-star'}" placeholder="fas fa-star" style="margin-bottom:8px" />
-        <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto;background:var(--bg-card2);padding:8px;border-radius:8px;border:1px solid var(--border)">
-          ${['fas fa-star','fas fa-fire','fas fa-crown','fas fa-gem','fas fa-dragon','fas fa-shield-alt','fas fa-bolt','fas fa-seedling','fas fa-pen','fas fa-book','fas fa-trophy','fas fa-medal','fas fa-rocket','fas fa-skull','fas fa-chess-queen','fas fa-fist-raised','fas fa-leaf','fas fa-feather','fas fa-eye','fas fa-infinity','fas fa-atom','fas fa-brain','fas fa-heart','fas fa-sun','fas fa-moon','fas fa-dove','fas fa-paw','fas fa-anchor','fas fa-flask','fas fa-code','fas fa-terminal','fas fa-key','fas fa-sword','fas fa-hat-wizard']
-            .map(ic => `<button type="button" class="icon-pick-btn" data-icon="${ic}" title="${ic}" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 8px;cursor:pointer;color:var(--text-secondary);font-size:16px;transition:all 0.15s" onclick="document.getElementById('lv-icon').value='${ic}';document.getElementById('lv-icon').dispatchEvent(new Event('input'))"><i class="${ic}"></i></button>`).join('')}
-        </div>
+        <input id="lv-icon" type="text" value="${level ? escHtml(level.icon) : 'fas fa-star'}" placeholder="fas fa-star" style="margin-bottom:6px" />
+        <input id="lv-icon-search" type="text" placeholder="İkon ara... (star, fire, crown...)" style="margin-bottom:6px" />
+        <div id="lv-icon-grid" style="display:flex;flex-wrap:wrap;gap:5px;max-height:180px;overflow-y:auto;background:var(--bg-card2);padding:8px;border-radius:8px;border:1px solid var(--border)"></div>
       </div>
     </div>
     <div class="form-row">
@@ -457,9 +460,27 @@ function showLevelModal(level, cb) {
       <div class="form-group"><label>Sıra</label><input id="lv-order" type="number" value="${level ? level.order_num : 0}" /></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-      <div class="form-group"><label>Min Forum</label><input id="lv-forums" type="number" value="${level ? level.min_forums : 0}" /></div>
-      <div class="form-group"><label>Min Kitap</label><input id="lv-books" type="number" value="${level ? level.min_books : 0}" /></div>
-      <div class="form-group"><label>Min Yorum</label><input id="lv-comments" type="number" value="${level ? level.min_comments : 0}" /></div>
+      <div class="form-group">
+        <label>Min Konu</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="lv-forums" type="number" min="0" value="${level ? (isInfMin(level.min_forums) ? '' : level.min_forums) : 0}" placeholder="0" style="flex:1" />
+          <button type="button" id="lv-forums-inf" title="Sonsuz" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px;flex-shrink:0;transition:all 0.15s" class="${level && isInfMin(level.min_forums) ? 'inf-active' : ''}">∞</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Min Kitap</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="lv-books" type="number" min="0" value="${level ? (isInfMin(level.min_books) ? '' : level.min_books) : 0}" placeholder="0" style="flex:1" />
+          <button type="button" id="lv-books-inf" title="Sonsuz" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px;flex-shrink:0;transition:all 0.15s" class="${level && isInfMin(level.min_books) ? 'inf-active' : ''}">∞</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Min Yorum</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="lv-comments" type="number" min="0" value="${level ? (isInfMin(level.min_comments) ? '' : level.min_comments) : 0}" placeholder="0" style="flex:1" />
+          <button type="button" id="lv-comments-inf" title="Sonsuz" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px;flex-shrink:0;transition:all 0.15s" class="${level && isInfMin(level.min_comments) ? 'inf-active' : ''}">∞</button>
+        </div>
+      </div>
     </div>
     <div style="margin-top:8px;padding:10px;background:var(--bg-card2);border-radius:8px;display:flex;align-items:center;gap:10px">
       <i id="lv-preview-icon" class="${level ? level.icon : 'fas fa-star'}" style="color:${level ? level.color : '#dc2626'};font-size:20px"></i>
@@ -469,6 +490,21 @@ function showLevelModal(level, cb) {
     <div id="lv-error" class="form-error" style="margin-top:8px"></div>
   `);
 
+  const style = document.createElement('style');
+  style.textContent = '.inf-active { color: var(--accent-red2) !important; border-color: var(--accent-red) !important; background: rgba(220,38,38,0.12) !important; }';
+  document.head.appendChild(style);
+
+  function renderIconGrid(filter) {
+    const grid = $('#lv-icon-grid'); if (!grid) return;
+    const filtered = filter ? ALL_FA_ICONS.filter(ic => ic.includes(filter.toLowerCase())) : ALL_FA_ICONS;
+    grid.innerHTML = filtered.map(ic =>
+      `<button type="button" title="${ic}" style="background:none;border:1px solid var(--border);border-radius:6px;padding:6px 8px;cursor:pointer;color:var(--text-secondary);font-size:16px;transition:all 0.15s;min-width:36px" onclick="document.getElementById('lv-icon').value='${ic}';document.getElementById('lv-icon').dispatchEvent(new Event('input'))"><i class="${ic}"></i></button>`
+    ).join('');
+  }
+  renderIconGrid('');
+
+  $('#lv-icon-search').addEventListener('input', e => renderIconGrid(e.target.value.trim()));
+
   ['lv-name', 'lv-icon', 'lv-color'].forEach(id => {
     $('#' + id)?.addEventListener('input', () => {
       const icon = $('#lv-icon').value; const color = $('#lv-color').value; const name = $('#lv-name').value;
@@ -477,8 +513,34 @@ function showLevelModal(level, cb) {
     });
   });
 
+  ['forums','books','comments'].forEach(f => {
+    const btn = $(`#lv-${f}-inf`);
+    const inp = $(`#lv-${f}`);
+    if (!btn || !inp) return;
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('inf-active')) {
+        btn.classList.remove('inf-active'); inp.disabled = false; inp.value = 0;
+      } else {
+        btn.classList.add('inf-active'); inp.disabled = true; inp.value = '';
+      }
+    });
+  });
+
   $('#lv-submit').addEventListener('click', async () => {
-    const body = { name: $('#lv-name').value.trim(), icon: $('#lv-icon').value.trim(), color: $('#lv-color').value, min_forums: parseInt($('#lv-forums').value) || 0, min_books: parseInt($('#lv-books').value) || 0, min_comments: parseInt($('#lv-comments').value) || 0, order_num: parseInt($('#lv-order').value) || 0 };
+    const getVal = (id) => {
+      const btn = $(`#${id}-inf`);
+      if (btn && btn.classList.contains('inf-active')) return 9999999;
+      return parseInt($(`#${id}`).value) || 0;
+    };
+    const body = {
+      name: $('#lv-name').value.trim(),
+      icon: $('#lv-icon').value.trim(),
+      color: $('#lv-color').value,
+      min_forums: getVal('lv-forums'),
+      min_books: getVal('lv-books'),
+      min_comments: getVal('lv-comments'),
+      order_num: parseInt($('#lv-order').value) || 0
+    };
     if (!body.name) { $('#lv-error').textContent = 'İsim zorunlu'; return; }
     try {
       if (level) await adminApi('/level/' + level.id, { method: 'PUT', body: JSON.stringify(body) });
