@@ -475,11 +475,59 @@ function showLevelModal(level, cb) {
         </div>
       </div>
       <div class="form-group">
+        <label>Min Kitap Sayfası</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="lv-bookpages" type="number" min="0" value="${level ? (isInfMin(level.min_book_pages || 0) ? '' : (level.min_book_pages || 0)) : 0}" placeholder="0" style="flex:1" />
+          <button type="button" id="lv-bookpages-inf" title="Sonsuz" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px;flex-shrink:0;transition:all 0.15s" class="${level && isInfMin(level.min_book_pages || 0) ? 'inf-active' : ''}">∞</button>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Min Yorum</label>
         <div style="display:flex;gap:6px;align-items:center">
           <input id="lv-comments" type="number" min="0" value="${level ? (isInfMin(level.min_comments) ? '' : level.min_comments) : 0}" placeholder="0" style="flex:1" />
           <button type="button" id="lv-comments-inf" title="Sonsuz" style="background:var(--bg-card2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--text-secondary);font-size:16px;flex-shrink:0;transition:all 0.15s" class="${level && isInfMin(level.min_comments) ? 'inf-active' : ''}">∞</button>
         </div>
+      </div>
+      <div class="form-group" style="align-self:end">
+        <label style="margin-bottom:8px">Koşul Türü</label>
+        <label class="checkbox-label" style="font-size:13px">
+          <input type="checkbox" id="lv-require-any" ${level && level.require_any ? 'checked' : ''} />
+          Herhangi biri yeterli (VEYA)
+        </label>
+      </div>
+    </div>
+    <div style="margin-top:4px;padding:10px;background:rgba(220,38,38,0.05);border-radius:8px;border:1px solid rgba(220,38,38,0.15)">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;font-weight:600">Günlük Limit (Normal Üye / VIP / Plus) — -1 = Sınırsız</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px">Konu / gün</label>
+          <div style="display:flex;gap:4px">
+            <input id="lv-dlimit-forums" type="number" min="-1" value="${level ? (level.daily_forums ?? -1) : -1}" placeholder="-1" title="Normal" />
+            <input id="lv-dlimit-forums-vip" type="number" min="-1" value="${level ? (level.daily_forums_vip ?? -1) : -1}" placeholder="-1" title="VIP" style="border-color:rgba(251,191,36,0.4)" />
+            <input id="lv-dlimit-forums-plus" type="number" min="-1" value="${level ? (level.daily_forums_plus ?? -1) : -1}" placeholder="-1" title="Plus" style="border-color:rgba(129,140,248,0.4)" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px">Kitap / gün</label>
+          <div style="display:flex;gap:4px">
+            <input id="lv-dlimit-books" type="number" min="-1" value="${level ? (level.daily_books ?? -1) : -1}" placeholder="-1" />
+            <input id="lv-dlimit-books-vip" type="number" min="-1" value="${level ? (level.daily_books_vip ?? -1) : -1}" placeholder="-1" style="border-color:rgba(251,191,36,0.4)" />
+            <input id="lv-dlimit-books-plus" type="number" min="-1" value="${level ? (level.daily_books_plus ?? -1) : -1}" placeholder="-1" style="border-color:rgba(129,140,248,0.4)" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px">Sayfa / gün</label>
+          <div style="display:flex;gap:4px">
+            <input id="lv-dlimit-pages" type="number" min="-1" value="${level ? (level.daily_book_pages ?? -1) : -1}" placeholder="-1" />
+            <input id="lv-dlimit-pages-vip" type="number" min="-1" value="${level ? (level.daily_book_pages_vip ?? -1) : -1}" placeholder="-1" style="border-color:rgba(251,191,36,0.4)" />
+            <input id="lv-dlimit-pages-plus" type="number" min="-1" value="${level ? (level.daily_book_pages_plus ?? -1) : -1}" placeholder="-1" style="border-color:rgba(129,140,248,0.4)" />
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:10px;color:var(--text-muted)">
+        <span>Normal (siyah)</span>
+        <span style="color:#fbbf24">VIP (sarı)</span>
+        <span style="color:#818cf8">Plus (mor)</span>
       </div>
     </div>
     <div style="margin-top:8px;padding:10px;background:var(--bg-card2);border-radius:8px;display:flex;align-items:center;gap:10px">
@@ -513,7 +561,7 @@ function showLevelModal(level, cb) {
     });
   });
 
-  ['forums','books','comments'].forEach(f => {
+  ['forums','books','bookpages','comments'].forEach(f => {
     const btn = $(`#lv-${f}-inf`);
     const inp = $(`#lv-${f}`);
     if (!btn || !inp) return;
@@ -538,8 +586,19 @@ function showLevelModal(level, cb) {
       color: $('#lv-color').value,
       min_forums: getVal('lv-forums'),
       min_books: getVal('lv-books'),
+      min_book_pages: getVal('lv-bookpages'),
       min_comments: getVal('lv-comments'),
-      order_num: parseInt($('#lv-order').value) || 0
+      require_any: $('#lv-require-any').checked ? 1 : 0,
+      order_num: parseInt($('#lv-order').value) || 0,
+      daily_forums: parseInt($('#lv-dlimit-forums').value) ?? -1,
+      daily_books: parseInt($('#lv-dlimit-books').value) ?? -1,
+      daily_book_pages: parseInt($('#lv-dlimit-pages').value) ?? -1,
+      daily_forums_vip: parseInt($('#lv-dlimit-forums-vip').value) ?? -1,
+      daily_books_vip: parseInt($('#lv-dlimit-books-vip').value) ?? -1,
+      daily_book_pages_vip: parseInt($('#lv-dlimit-pages-vip').value) ?? -1,
+      daily_forums_plus: parseInt($('#lv-dlimit-forums-plus').value) ?? -1,
+      daily_books_plus: parseInt($('#lv-dlimit-books-plus').value) ?? -1,
+      daily_book_pages_plus: parseInt($('#lv-dlimit-pages-plus').value) ?? -1,
     };
     if (!body.name) { $('#lv-error').textContent = 'İsim zorunlu'; return; }
     try {

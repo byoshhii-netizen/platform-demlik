@@ -1407,17 +1407,56 @@ async function renderProfile(app, username) {
   let data;
   try { data = await api('/profile/' + username); } catch { app.innerHTML = '<div class="container page"><div class="empty-state"><i class="fas fa-user-slash"></i><p>Kullanıcı bulunamadı.</p></div></div>'; return; }
 
-  const { user, forums, books, groups, level, levels } = data;
+  const { user, forums, books, groups, level, levels, book_page_count } = data;
   document.title = user.username + ' - Demlik';
 
   const nextLevel = levels.find(l => l.order_num > (level?.order_num || 0));
   let progressHTML = '';
   if (nextLevel) {
-    const forumPct = nextLevel.min_forums > 0 ? Math.min(100, Math.round((user.forum_count / nextLevel.min_forums) * 100)) : 100;
-    const bookPct = nextLevel.min_books > 0 ? Math.min(100, Math.round((user.book_count / nextLevel.min_books) * 100)) : 100;
-    const commentPct = nextLevel.min_comments > 0 ? Math.min(100, Math.round((user.comment_count / nextLevel.min_comments) * 100)) : 100;
-    const overall = Math.round((forumPct + bookPct + commentPct) / 3);
-    progressHTML = `<div style="margin-top:12px"><div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Sonraki seviye: ${escHtml(nextLevel.name)} (${overall}%)</div><div class="progress-bar"><div class="progress-fill" style="width:${overall}%"></div></div></div>`;
+    const reqAny = nextLevel.require_any === 1;
+    const INF = 9999999;
+    const nf = nextLevel.min_forums >= INF ? null : nextLevel.min_forums;
+    const nb = nextLevel.min_books >= INF ? null : nextLevel.min_books;
+    const nc = nextLevel.min_comments >= INF ? null : nextLevel.min_comments;
+    const nbp = (nextLevel.min_book_pages || 0) >= INF ? null : (nextLevel.min_book_pages || 0);
+
+    const remaining = [];
+    if (nf !== null && nf > 0) { const left = Math.max(0, nf - user.forum_count); if (left > 0) remaining.push(`${left} konu`); }
+    if (nb !== null && nb > 0) { const left = Math.max(0, nb - user.book_count); if (left > 0) remaining.push(`${left} kitap`); }
+    if (nbp !== null && nbp > 0) { const left = Math.max(0, nbp - (book_page_count || 0)); if (left > 0) remaining.push(`${left} kitap sayfası`); }
+    if (nc !== null && nc > 0) { const left = Math.max(0, nc - user.comment_count); if (left > 0) remaining.push(`${left} yorum`); }
+
+    let overallPct = 0;
+    const metrics = [];
+    if (nf !== null && nf > 0) metrics.push(Math.min(100, Math.round((user.forum_count / nf) * 100)));
+    if (nb !== null && nb > 0) metrics.push(Math.min(100, Math.round((user.book_count / nb) * 100)));
+    if (nbp !== null && nbp > 0) metrics.push(Math.min(100, Math.round(((book_page_count || 0) / nbp) * 100)));
+    if (nc !== null && nc > 0) metrics.push(Math.min(100, Math.round((user.comment_count / nc) * 100)));
+
+    if (reqAny) {
+      overallPct = metrics.length > 0 ? Math.max(...metrics) : 100;
+    } else {
+      overallPct = metrics.length > 0 ? Math.round(metrics.reduce((a, b) => a + b, 0) / metrics.length) : 100;
+    }
+
+    let hint = '';
+    if (remaining.length > 0) {
+      if (reqAny) {
+        const minLeft = remaining[0];
+        hint = `<div style="font-size:11px;color:var(--text-muted);margin-top:3px">En az: ${remaining.join(' veya ')} yaz</div>`;
+      } else {
+        hint = `<div style="font-size:11px;color:var(--text-muted);margin-top:3px">${remaining.join(', ')} kaldı</div>`;
+      }
+    }
+
+    progressHTML = `<div style="margin-top:12px">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">
+        ${escHtml(nextLevel.name)} seviyesine ${overallPct}% tamamlandı
+        ${reqAny ? '<span style="color:var(--accent-red2);font-size:10px;margin-left:6px">(herhangi biri)</span>' : ''}
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${overallPct}%"></div></div>
+      ${hint}
+    </div>`;
   }
 
   const levelColor = level?.color || '#6b7280';

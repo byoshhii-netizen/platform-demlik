@@ -221,6 +221,17 @@ CREATE TABLE IF NOT EXISTS forum_tags (
 // image_url kolonu book_pages tablosuna ekle (tablo zaten varsa ALTER TABLE ile)
 try { db.exec("ALTER TABLE book_pages ADD COLUMN image_url TEXT DEFAULT ''"); } catch {}
 try { db.exec("ALTER TABLE forums ADD COLUMN custom_tags TEXT DEFAULT ''"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN min_book_pages INTEGER DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN require_any INTEGER DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_forums INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_books INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_book_pages INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_forums_vip INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_books_vip INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_book_pages_vip INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_forums_plus INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_books_plus INTEGER DEFAULT -1"); } catch {}
+try { db.exec("ALTER TABLE levels ADD COLUMN daily_book_pages_plus INTEGER DEFAULT -1"); } catch {}
 
 const levelCount = db.prepare('SELECT COUNT(*) as c FROM levels').get().c;
 if (levelCount === 0) {

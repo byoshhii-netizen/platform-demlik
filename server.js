@@ -130,21 +130,54 @@ function makeSlug(title, id) {
 function updateUserLevel(userId) {
   const user = db.prepare('SELECT forum_count, book_count, comment_count FROM users WHERE id=?').get(userId);
   if (!user) return;
+  const bookPageCount = db.prepare('SELECT COUNT(*) as c FROM book_pages bp INNER JOIN books b ON bp.book_id=b.id WHERE b.user_id=?').get(userId)?.c || 0;
   const levels = db.prepare('SELECT * FROM levels ORDER BY order_num ASC').all();
   let bestLevel = levels[0];
   for (const lv of levels) {
-    const minF = lv.min_forums >= 9999999 ? Infinity : lv.min_forums;
-    const minB = lv.min_books >= 9999999 ? Infinity : lv.min_books;
-    const minC = lv.min_comments >= 9999999 ? Infinity : lv.min_comments;
-    if (user.forum_count >= minF && user.book_count >= minB && user.comment_count >= minC) {
-      bestLevel = lv;
+    const minF = lv.min_forums >= 9999999 ? Infinity : (lv.min_forums || 0);
+    const minB = lv.min_books >= 9999999 ? Infinity : (lv.min_books || 0);
+    const minC = lv.min_comments >= 9999999 ? Infinity : (lv.min_comments || 0);
+    const minBP = (lv.min_book_pages || 0) >= 9999999 ? Infinity : (lv.min_book_pages || 0);
+    const reqAny = lv.require_any === 1;
+    let meets;
+    if (reqAny) {
+      meets = user.forum_count >= minF || user.book_count >= minB || user.comment_count >= minC || bookPageCount >= minBP;
+    } else {
+      meets = user.forum_count >= minF && user.book_count >= minB && user.comment_count >= minC && bookPageCount >= minBP;
     }
+    if (meets) bestLevel = lv;
   }
   db.prepare('UPDATE users SET level_id=? WHERE id=?').run(bestLevel.id, userId);
 }
 
 function logAction(actor, action, target = '', detail = '', ip = '') {
   db.prepare('INSERT INTO system_logs (actor,action,target,detail,ip) VALUES (?,?,?,?,?)').run(actor, action, target, detail, ip);
+}
+
+function getDailyLimit(user, lv, type) {
+  if (!lv) return -1;
+  const suffix = user.is_vip ? '_vip' : (user.is_plus ? '_plus' : '');
+  const col = `daily_${type}${suffix}`;
+  const val = lv[col];
+  if (val === undefined || val === null) return lv[`daily_${type}`] ?? -1;
+  return val;
+}
+
+function checkDailyLimit(userId, user, type) {
+  const lv = db.prepare('SELECT * FROM levels WHERE id=?').get(user.level_id);
+  const limit = getDailyLimit(user, lv, type);
+  if (limit === -1 || limit >= 9999999) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  let count = 0;
+  if (type === 'forums') {
+    count = db.prepare("SELECT COUNT(*) as c FROM forums WHERE user_id=? AND date(created_at)=?").get(userId, today)?.c || 0;
+  } else if (type === 'books') {
+    count = db.prepare("SELECT COUNT(*) as c FROM books WHERE user_id=? AND date(created_at)=?").get(userId, today)?.c || 0;
+  } else if (type === 'book_pages') {
+    count = db.prepare("SELECT COUNT(*) as c FROM book_pages bp INNER JOIN books b ON bp.book_id=b.id WHERE b.user_id=? AND date(bp.created_at)=?").get(userId, today)?.c || 0;
+  }
+  if (count >= limit) return `Bugün en fazla ${limit} ${type === 'forums' ? 'konu' : type === 'books' ? 'kitap' : 'kitap sayfası'} oluşturabilirsiniz.`;
+  return null;
 }
 
 
@@ -253,6 +286,9 @@ app.post('/api/forum/:slug/view', (req, res) => {
 app.post('/api/forums', authMiddleware, (req, res) => {
   const { title, content, banner_image, allow_comments, tagIds, customTags } = req.body;
   if (!title || !content) return res.status(400).json({ error: 'Baï¿½lï¿½k ve iï¿½erik zorunlu' });
+
+  const limitErr = checkDailyLimit(req.user.id, req.user, 'forums');
+  if (limitErr) return res.status(429).json({ error: limitErr });
 
   const tempSlug = slugify(title, { lower: true, strict: false, locale: 'tr' }).substring(0, 60) + '-' + uuidv4().substring(0, 8);
   try {
@@ -439,6 +475,10 @@ app.get('/api/book/:slug', (req, res) => {
 app.post('/api/books', authMiddleware, (req, res) => {
   const { title, preface, cover_image } = req.body;
   if (!title) return res.status(400).json({ error: 'Baï¿½lï¿½k zorunlu' });
+
+  const limitErr = checkDailyLimit(req.user.id, req.user, 'books');
+  if (limitErr) return res.status(429).json({ error: limitErr });
+
   const tempSlug = slugify(title, { lower: true, strict: false, locale: 'tr' }).substring(0, 60) + '-' + uuidv4().substring(0, 8);
   try {
     const result = db.prepare('INSERT INTO books (user_id, title, preface, cover_image, slug) VALUES (?,?,?,?,?)').run(req.user.id, title, preface || '', cover_image || '', tempSlug);
@@ -484,6 +524,10 @@ app.post('/api/book/:slug/pages', authMiddleware, (req, res) => {
   if (book.user_id !== req.user.id) return res.status(403).json({ error: 'Yetki yok' });
   const { title, content, chapter_id, image_url } = req.body;
   if (!title || !content) return res.status(400).json({ error: 'Baï¿½lï¿½k ve iï¿½erik zorunlu' });
+
+  const limitErr = checkDailyLimit(req.user.id, req.user, 'book_pages');
+  if (limitErr) return res.status(429).json({ error: limitErr });
+
   const pageCount = db.prepare('SELECT COUNT(*) as c FROM book_pages WHERE book_id=?').get(book.id).c;
   const pageNum = pageCount + 1;
   const tempSlug = slugify(title, { lower: true, strict: false, locale: 'tr' }).substring(0, 40) + '-' + Date.now();
@@ -771,7 +815,8 @@ app.get('/api/profile/:username', (req, res) => {
   const groups = db.prepare(`SELECT g.* FROM groups g INNER JOIN group_members gm ON g.id=gm.group_id WHERE gm.user_id=? LIMIT 20`).all(user.id);
   const level = db.prepare('SELECT * FROM levels WHERE id=?').get(user.level_id);
   const levels = db.prepare('SELECT * FROM levels ORDER BY order_num ASC').all();
-  res.json({ user: sanitizeUser(user), forums, books, groups, level, levels });
+  const book_page_count = db.prepare('SELECT COUNT(*) as c FROM book_pages bp INNER JOIN books b ON bp.book_id=b.id WHERE b.user_id=?').get(user.id)?.c || 0;
+  res.json({ user: sanitizeUser(user), forums, books, groups, level, levels, book_page_count });
 });
 
 app.put('/api/profile', authMiddleware, upload.single('avatar'), (req, res) => {
@@ -918,18 +963,36 @@ app.get('/api/admin/levels', adminMiddleware, (req, res) => {
 });
 
 app.post('/api/admin/levels', adminMiddleware, (req, res) => {
-  const { name, icon, color, min_forums, min_books, min_comments, order_num } = req.body;
+  const { name, icon, color, min_forums, min_books, min_book_pages, min_comments, require_any, order_num,
+    daily_forums, daily_books, daily_book_pages, daily_forums_vip, daily_books_vip, daily_book_pages_vip,
+    daily_forums_plus, daily_books_plus, daily_book_pages_plus } = req.body;
   if (!name) return res.status(400).json({ error: 'ï¿½sim zorunlu' });
-  const result = db.prepare('INSERT INTO levels (name,icon,color,min_forums,min_books,min_comments,order_num) VALUES (?,?,?,?,?,?,?)').run(name, icon || 'fas fa-star', color || '#dc2626', min_forums || 0, min_books || 0, min_comments || 0, order_num || 0);
+  const result = db.prepare('INSERT INTO levels (name,icon,color,min_forums,min_books,min_book_pages,min_comments,require_any,order_num,daily_forums,daily_books,daily_book_pages,daily_forums_vip,daily_books_vip,daily_book_pages_vip,daily_forums_plus,daily_books_plus,daily_book_pages_plus) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+    name, icon || 'fas fa-star', color || '#dc2626',
+    min_forums || 0, min_books || 0, min_book_pages || 0, min_comments || 0, require_any ? 1 : 0, order_num || 0,
+    daily_forums ?? -1, daily_books ?? -1, daily_book_pages ?? -1,
+    daily_forums_vip ?? -1, daily_books_vip ?? -1, daily_book_pages_vip ?? -1,
+    daily_forums_plus ?? -1, daily_books_plus ?? -1, daily_book_pages_plus ?? -1
+  );
   res.json(db.prepare('SELECT * FROM levels WHERE id=?').get(result.lastInsertRowid));
 });
 
 app.put('/api/admin/level/:id', adminMiddleware, (req, res) => {
   const lv = db.prepare('SELECT * FROM levels WHERE id=?').get(req.params.id);
   if (!lv) return res.status(404).json({ error: 'Seviye bulunamadï¿½' });
-  const { name, icon, color, min_forums, min_books, min_comments, order_num } = req.body;
-  db.prepare('UPDATE levels SET name=?,icon=?,color=?,min_forums=?,min_books=?,min_comments=?,order_num=? WHERE id=?').run(
-    name || lv.name, icon || lv.icon, color || lv.color, min_forums ?? lv.min_forums, min_books ?? lv.min_books, min_comments ?? lv.min_comments, order_num ?? lv.order_num, lv.id
+  const { name, icon, color, min_forums, min_books, min_book_pages, min_comments, require_any, order_num,
+    daily_forums, daily_books, daily_book_pages, daily_forums_vip, daily_books_vip, daily_book_pages_vip,
+    daily_forums_plus, daily_books_plus, daily_book_pages_plus } = req.body;
+  db.prepare(`UPDATE levels SET name=?,icon=?,color=?,min_forums=?,min_books=?,min_book_pages=?,min_comments=?,require_any=?,order_num=?,
+    daily_forums=?,daily_books=?,daily_book_pages=?,daily_forums_vip=?,daily_books_vip=?,daily_book_pages_vip=?,
+    daily_forums_plus=?,daily_books_plus=?,daily_book_pages_plus=? WHERE id=?`).run(
+    name || lv.name, icon || lv.icon, color || lv.color,
+    min_forums ?? lv.min_forums, min_books ?? lv.min_books, min_book_pages ?? (lv.min_book_pages || 0), min_comments ?? lv.min_comments,
+    require_any !== undefined ? (require_any ? 1 : 0) : (lv.require_any || 0), order_num ?? lv.order_num,
+    daily_forums ?? (lv.daily_forums ?? -1), daily_books ?? (lv.daily_books ?? -1), daily_book_pages ?? (lv.daily_book_pages ?? -1),
+    daily_forums_vip ?? (lv.daily_forums_vip ?? -1), daily_books_vip ?? (lv.daily_books_vip ?? -1), daily_book_pages_vip ?? (lv.daily_book_pages_vip ?? -1),
+    daily_forums_plus ?? (lv.daily_forums_plus ?? -1), daily_books_plus ?? (lv.daily_books_plus ?? -1), daily_book_pages_plus ?? (lv.daily_book_pages_plus ?? -1),
+    lv.id
   );
   res.json(db.prepare('SELECT * FROM levels WHERE id=?').get(lv.id));
 });
