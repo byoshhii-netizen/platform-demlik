@@ -122,10 +122,22 @@
       </button>
     </div>
     <div class="mobile-menu hidden" id="mobile-menu">
-      <a href="/" data-link class="mobile-nav-link">Ana Sayfa</a>
-      <a href="/forum" data-link class="mobile-nav-link">Konular</a>
-      <a href="/kitaplar" data-link class="mobile-nav-link">Kitaplar</a>
-      <a href="/gruplar" data-link class="mobile-nav-link">Gruplar</a>
+      <!-- Giriş yapmamışsa auth butonları -->
+      <div class="mobile-menu-auth" id="mobile-menu-auth">
+        <a href="/kayit" data-link class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Kayıt Ol</a>
+        <a href="/giris" data-link class="btn btn-outline btn-sm"><i class="fas fa-sign-in-alt"></i> Giriş Yap</a>
+      </div>
+      <!-- Giriş yapmışsa yeni butonları -->
+      <div class="mobile-menu-new hidden" id="mobile-menu-new">
+        <button class="btn btn-primary btn-sm" id="mob-new-forum"><i class="fas fa-comments"></i> Konu</button>
+        <button class="btn btn-outline btn-sm" id="mob-new-book"><i class="fas fa-book"></i> Kitap</button>
+        <button class="btn btn-outline btn-sm" id="mob-new-group"><i class="fas fa-users"></i> Grup</button>
+      </div>
+      <a href="/" data-link class="mobile-nav-link"><i class="fas fa-home" style="width:18px"></i> Ana Sayfa</a>
+      <a href="/forum" data-link class="mobile-nav-link"><i class="fas fa-comments" style="width:18px"></i> Konular</a>
+      <a href="/kitaplar" data-link class="mobile-nav-link"><i class="fas fa-book" style="width:18px"></i> Kitaplar</a>
+      <a href="/gruplar" data-link class="mobile-nav-link"><i class="fas fa-users" style="width:18px"></i> Gruplar</a>
+      <div id="mobile-menu-user-links"></div>
     </div>
   </nav>
 

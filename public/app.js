@@ -170,13 +170,33 @@ async function initAuth() {
 function updateNavUI() {
   const authEl = $('#nav-auth');
   const userEl = $('#nav-user');
+  const mobAuth = $('#mobile-menu-auth');
+  const mobNew = $('#mobile-menu-new');
+  const mobUserLinks = $('#mobile-menu-user-links');
+
   if (currentUser) {
     authEl.classList.add('hidden');
     userEl.classList.remove('hidden');
     const nav = currentUser.avatar ? `<img src="${escHtml(currentUser.avatar)}" class="nav-avatar" />` : `<div class="nav-avatar avatar-placeholder"><i class="fas fa-user" style="font-size:12px"></i></div>`;
     const btn = $('#nav-user-btn');
-    btn.innerHTML = `${nav}<span>${escHtml(currentUser.username)}</span><i class="fas fa-chevron-down"></i>`;
+    btn.innerHTML = `${nav}<i class="fas fa-chevron-down" style="font-size:10px;color:var(--text-muted)"></i>`;
     $('#dropdown-profile').setAttribute('href', '/profil/' + currentUser.username);
+
+    if (mobAuth) mobAuth.classList.add('hidden');
+    if (mobNew) mobNew.classList.remove('hidden');
+    if (mobUserLinks) mobUserLinks.innerHTML = `
+      <a href="/profil/${escHtml(currentUser.username)}" data-link class="mobile-nav-link"><i class="fas fa-user" style="width:18px"></i> Profilim</a>
+      <a href="/ayarlar" data-link class="mobile-nav-link"><i class="fas fa-cog" style="width:18px"></i> Ayarlar</a>
+      <button class="mobile-nav-link" id="mob-logout" style="background:none;border:none;width:100%;text-align:left;color:var(--accent-red2)"><i class="fas fa-sign-out-alt" style="width:18px"></i> Çıkış Yap</button>
+    `;
+    $('#mob-logout')?.addEventListener('click', async () => {
+      try { await api('/auth/logout', { method: 'POST' }); } catch {}
+      currentToken = null; currentUser = null;
+      localStorage.removeItem('token');
+      updateNavUI(); navigate('/'); toast('Çıkış yapıldı');
+      $('#mobile-menu').classList.add('hidden');
+    });
+
     const mbbAuth = $('#mbb-auth');
     if (mbbAuth) {
       mbbAuth.setAttribute('href', '/profil/' + currentUser.username);
@@ -186,6 +206,10 @@ function updateNavUI() {
   } else {
     authEl.classList.remove('hidden');
     userEl.classList.add('hidden');
+    if (mobAuth) mobAuth.classList.remove('hidden');
+    if (mobNew) mobNew.classList.add('hidden');
+    if (mobUserLinks) mobUserLinks.innerHTML = '';
+
     const mbbAuth = $('#mbb-auth');
     if (mbbAuth) {
       mbbAuth.setAttribute('href', '/giris');
@@ -228,6 +252,21 @@ $('#logout-btn').addEventListener('click', async () => {
 
 $('#mobile-toggle').addEventListener('click', () => {
   $('#mobile-menu').classList.toggle('hidden');
+});
+
+document.addEventListener('click', e => {
+  if (!$('#mobile-menu')?.contains(e.target) && !$('#mobile-toggle')?.contains(e.target)) {
+    $('#mobile-menu')?.classList.add('hidden');
+  }
+});
+
+document.addEventListener('click', e => {
+  const mobNewForum = e.target.closest('#mob-new-forum');
+  const mobNewBook = e.target.closest('#mob-new-book');
+  const mobNewGroup = e.target.closest('#mob-new-group');
+  if (mobNewForum) { $('#mobile-menu').classList.add('hidden'); navigate('/forum'); setTimeout(() => showNewForumModal(), 100); }
+  if (mobNewBook) { $('#mobile-menu').classList.add('hidden'); navigate('/kitaplar'); setTimeout(() => showNewBookModal(), 100); }
+  if (mobNewGroup) { $('#mobile-menu').classList.add('hidden'); navigate('/gruplar'); setTimeout(() => showNewGroupModal(), 100); }
 });
 
 async function renderHome(app) {

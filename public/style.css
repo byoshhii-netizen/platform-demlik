@@ -741,7 +741,30 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   .nav-mobile-toggle { padding: 8px; min-width: 44px; min-height: 44px; }
 }
 
-/* --- Sticky bottom bar mobilde --- */
+/* ===== NAVBAR MOBİL OVERFLOW FIX ===== */
+@media (max-width: 768px) {
+  .nav-container { padding: 0 12px; gap: 0; height: 54px; overflow: hidden; }
+  .nav-brand { flex: 1; min-width: 0; }
+  .nav-auth { display: none !important; }
+  #new-btn-wrap { display: none !important; }
+  .nav-user-btn span { display: none; }
+  .nav-user-btn i.fa-chevron-down { display: none; }
+  .nav-user-btn { padding: 5px 8px; border: none; background: none; gap: 0; }
+  #nav-user { gap: 4px !important; flex-shrink: 0; }
+  .nav-mobile-toggle { display: block; margin-left: 4px; flex-shrink: 0; }
+  .navbar { overflow: visible; }
+}
+
+/* Mobile menu içine auth + yeni butonları ekle */
+@media (max-width: 768px) {
+  .mobile-menu-auth { display: flex; gap: 8px; padding: 8px 12px 4px; }
+  .mobile-menu-auth .btn { flex: 1; justify-content: center; }
+  .mobile-menu-new { display: flex; gap: 6px; padding: 4px 12px 8px; border-bottom: 1px solid rgba(220,38,38,0.15); margin-bottom: 4px; }
+  .mobile-menu-new .btn { flex: 1; justify-content: center; font-size: 12px; padding: 7px 8px; }
+}
+@media (min-width: 769px) {
+  .mobile-menu-auth, .mobile-menu-new { display: none; }
+}
 @media (max-width: 768px) {
   .mobile-bottom-bar {
     display: flex;
