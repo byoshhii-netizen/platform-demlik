@@ -151,6 +151,7 @@ function updateNavActive(path) {
   $$('.nav-link').forEach(l => {
     l.classList.toggle('active', l.getAttribute('href') === path || (l.getAttribute('href') !== '/' && path.startsWith(l.getAttribute('href'))));
   });
+  updateMobileBottomBar(path);
 }
 
 async function initAuth() {
@@ -176,10 +177,29 @@ function updateNavUI() {
     const btn = $('#nav-user-btn');
     btn.innerHTML = `${nav}<span>${escHtml(currentUser.username)}</span><i class="fas fa-chevron-down"></i>`;
     $('#dropdown-profile').setAttribute('href', '/profil/' + currentUser.username);
+    const mbbAuth = $('#mbb-auth');
+    if (mbbAuth) {
+      mbbAuth.setAttribute('href', '/profil/' + currentUser.username);
+      const lbl = $('#mbb-auth-label'); if (lbl) lbl.textContent = 'Profil';
+      mbbAuth.querySelector('i').className = 'fas fa-user-circle';
+    }
   } else {
     authEl.classList.remove('hidden');
     userEl.classList.add('hidden');
+    const mbbAuth = $('#mbb-auth');
+    if (mbbAuth) {
+      mbbAuth.setAttribute('href', '/giris');
+      const lbl = $('#mbb-auth-label'); if (lbl) lbl.textContent = 'Giriş';
+      mbbAuth.querySelector('i').className = 'fas fa-sign-in-alt';
+    }
   }
+}
+
+function updateMobileBottomBar(path) {
+  $$('#mobile-bottom-bar a').forEach(a => {
+    const href = a.getAttribute('href');
+    a.classList.toggle('active', href === path || (href !== '/' && path.startsWith(href)));
+  });
 }
 
 $('#nav-user-btn').addEventListener('click', () => {

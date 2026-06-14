@@ -117,6 +117,49 @@
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg-secondary); }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ===== ADMİN MOBİL ===== */
+    @media (max-width: 900px) {
+      .admin-body { flex-direction: column; }
+      .admin-sidebar {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 8px;
+        gap: 4px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        -webkit-overflow-scrolling: touch;
+      }
+      .admin-sidebar::-webkit-scrollbar { height: 3px; }
+      .sidebar-item {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+      .sidebar-item i { font-size: 13px; }
+      .admin-main { padding: 16px; }
+      .admin-header { padding: 0 12px; }
+    }
+    @media (max-width: 600px) {
+      .form-row { grid-template-columns: 1fr !important; }
+      .table-wrap { font-size: 12px; }
+      th, td { padding: 8px 8px; }
+      .modal { max-width: 100%; border-radius: 16px 16px 0 0; }
+      .section-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .section-bar input { max-width: 100% !important; width: 100%; }
+      .page-title { font-size: 18px; margin-bottom: 12px; }
+      .btn { font-size: 12px; }
+      input, textarea, select { font-size: 16px; }
+      .login-box { padding: 24px 20px; }
+    }
+    @media (hover: none) and (pointer: coarse) {
+      .btn { min-height: 40px; }
+      .sidebar-item { min-height: 40px; }
+      td .btn { min-height: 34px; }
+    }
   </style>
 </head>
 <body>

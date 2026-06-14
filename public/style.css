@@ -581,3 +581,194 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   transition: all 0.15s;
 }
 .font-size-controls button:hover { border-color: var(--accent-red); color: var(--text-primary); }
+
+
+/* ===================================
+   MOBİL OPTİMİZASYON – KAPSAMLI
+   =================================== */
+
+/* --- Genel mobil iyileştirmeler --- */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+
+  .container { padding: 0 12px; }
+  .page { padding: 20px 0 40px; }
+  .page-title { font-size: 22px; }
+  .page-header { margin-bottom: 20px; }
+
+  /* Navbar mobil */
+  .nav-container { padding: 0 12px; gap: 8px; height: 54px; }
+  .nav-auth { gap: 6px; }
+  .nav-auth .btn { padding: 5px 10px; font-size: 12px; }
+  #new-btn-wrap .btn { padding: 5px 10px; font-size: 12px; }
+  .nav-user-btn { padding: 5px 8px; gap: 6px; font-size: 13px; }
+  .nav-avatar { width: 24px; height: 24px; }
+
+  /* Mobile menu geliştirilmiş */
+  .mobile-menu {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 12px 10px;
+  }
+  .mobile-nav-link {
+    padding: 11px 12px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+  }
+
+  /* Hero mobil */
+  .hero { min-height: 320px; }
+  .hero-content { padding: 30px 16px; }
+  .hero-title { font-size: 42px; letter-spacing: 3px; margin-bottom: 10px; }
+  .hero-subtitle { font-size: 14px; margin-bottom: 24px; }
+  .hero-buttons { gap: 10px; }
+  .btn-lg { padding: 11px 20px; font-size: 14px; }
+
+  /* Forum kartları */
+  .forum-card { flex-direction: column; }
+  .forum-card-accent { width: 100%; height: 3px; }
+  .forum-card-body { padding: 14px; }
+  .forum-card-banner { width: 100%; height: 140px; min-height: unset; }
+  .forum-card-title { font-size: 15px; }
+  .forum-card-meta { gap: 10px; }
+  .forum-meta-item { font-size: 11px; }
+
+  /* Kitap grid */
+  .grid-3 { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+  /* Bölüm başlıkları */
+  .section { margin-bottom: 36px; }
+  .section-header { margin-bottom: 16px; }
+  .section-title { font-size: 17px; }
+
+  /* Forum detay */
+  .forum-detail { max-width: 100%; }
+  .forum-detail-title { font-size: 20px; }
+  .forum-detail-meta { gap: 10px; font-size: 12px; }
+  .forum-detail-banner { aspect-ratio: 16/7; }
+  .forum-detail-content { font-size: 14px; }
+  .forum-actions { gap: 8px; }
+  .forum-action-btn { padding: 7px 12px; font-size: 12px; }
+
+  /* Yorumlar */
+  .comment-form { gap: 8px; }
+  .comment-avatar { width: 32px; height: 32px; }
+  .comment-body { padding: 10px 12px; }
+  .comment-content { font-size: 13px; }
+
+  /* Modal */
+  .modal { max-height: 95vh; max-width: 100%; margin: 0; border-radius: 16px 16px 0 0; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-header { padding: 16px 16px 0; }
+  .modal-body { padding: 0 16px 20px; }
+
+  /* Arama */
+  .search-bar { margin-bottom: 16px; }
+  .search-bar input { font-size: 15px; padding: 11px 11px 11px 38px; }
+
+  /* Profil */
+  .profile-header { padding: 20px 16px; gap: 16px; }
+  .profile-avatar { width: 80px; height: 80px; }
+  .profile-avatar-placeholder { width: 80px; height: 80px; font-size: 32px; }
+  .profile-username { font-size: 20px; }
+  .profile-stats { gap: 16px; }
+  .profile-stat-num { font-size: 18px; }
+
+  /* Kitap detay */
+  .book-detail-header { gap: 16px; }
+  .book-detail-cover { width: 120px; }
+  .book-detail-title { font-size: 20px; }
+
+  /* Grup */
+  .group-detail-layout { grid-template-columns: 1fr; gap: 16px; }
+  .chat-container { height: 420px; }
+  .chat-input-bar { padding: 8px; gap: 6px; }
+
+  /* Ayarlar */
+  .settings-layout { grid-template-columns: 1fr; gap: 16px; }
+  .settings-nav { flex-direction: row; overflow-x: auto; padding-bottom: 4px; gap: 4px; }
+  .settings-nav-item { white-space: nowrap; flex-shrink: 0; }
+
+  /* Toast */
+  #toast-container { bottom: 12px; right: 12px; left: 12px; }
+  .toast { min-width: unset; max-width: 100%; }
+
+  /* Butonlar */
+  .btn { font-size: 13px; }
+
+  /* Sayfa okuyucu */
+  .page-reader { max-width: 100%; }
+  .page-nav { flex-direction: column; gap: 8px; }
+  .page-nav-btn { width: 100%; }
+  .ebook-page-content { padding: 24px 16px; font-size: 15px; }
+  .ebook-toolbar { padding: 10px 12px; top: 54px; }
+  .ebook-layout { flex-direction: column; }
+  .ebook-toc { width: 100%; }
+
+  /* Tabs */
+  .tabs { overflow-x: auto; padding-bottom: 0; -webkit-overflow-scrolling: touch; }
+  .tab { white-space: nowrap; flex-shrink: 0; padding: 10px 14px; }
+
+  /* Form */
+  .form-row { grid-template-columns: 1fr; gap: 12px; }
+  input, textarea, select { font-size: 16px; } /* iOS zoom önleme */
+}
+
+@media (max-width: 480px) {
+  .grid-3 { grid-template-columns: 1fr; }
+  .hero-title { font-size: 34px; }
+  .forum-detail-title { font-size: 18px; }
+  .book-detail-header { flex-direction: column; }
+  .book-detail-cover { width: 100%; max-width: 180px; align-self: center; }
+  .profile-header { flex-direction: column; align-items: center; text-align: center; }
+  .profile-links { justify-content: center; }
+  .profile-stats { justify-content: center; }
+  .page-nav-btn.prev .page-nav-title,
+  .page-nav-btn.next .page-nav-title { display: none; }
+}
+
+/* --- Dokunma hedefleri --- */
+@media (hover: none) and (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .dropdown-item { min-height: 44px; }
+  .mobile-nav-link { min-height: 44px; }
+  .tab { min-height: 44px; }
+  .forum-action-btn { min-height: 40px; }
+  input, textarea, select { min-height: 44px; }
+  .nav-mobile-toggle { padding: 8px; min-width: 44px; min-height: 44px; }
+}
+
+/* --- Sticky bottom bar mobilde --- */
+@media (max-width: 768px) {
+  .mobile-bottom-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    z-index: 90;
+    padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+  }
+  .mobile-bottom-bar a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: var(--text-muted);
+    font-size: 10px;
+    padding: 4px 0;
+    transition: color 0.15s;
+  }
+  .mobile-bottom-bar a.active,
+  .mobile-bottom-bar a:hover { color: var(--accent-red2); }
+  .mobile-bottom-bar i { font-size: 18px; }
+  body { padding-bottom: 60px; }
+  #toast-container { bottom: 72px; }
+}
+@media (min-width: 769px) {
+  .mobile-bottom-bar { display: none; }
+}

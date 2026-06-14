@@ -962,6 +962,45 @@ app.get('/api/kvkk', (req, res) => {
 
 app.get('/panel-giris', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
+function injectMeta(title, desc, url, imageUrl) {
+  let html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  const img = imageUrl || `${SITE_URL}/demlik.png`;
+  const meta = `<title>${escapeHtml(title)}</title>
+    <meta name="description" content="${escapeHtml(desc)}" />
+    <link rel="canonical" href="${escapeHtml(url)}" />
+    <meta property="og:title" content="${escapeHtml(title)}" />
+    <meta property="og:description" content="${escapeHtml(desc)}" />
+    <meta property="og:url" content="${escapeHtml(url)}" />
+    <meta property="og:site_name" content="Demlik" />
+    <meta property="og:image" content="${escapeHtml(img)}" />
+    <meta name="twitter:title" content="${escapeHtml(title)}" />
+    <meta name="twitter:description" content="${escapeHtml(desc)}" />
+    <meta name="twitter:image" content="${escapeHtml(img)}" />`;
+  return html.replace('<title>Demlik</title>', meta);
+}
+
+app.get('/giris', (req, res) => {
+  res.send(injectMeta('Giriş – Demlik', 'Demlik hesabına giriş yap ve topluluğa katıl.', `${SITE_URL}/giris`, ''));
+});
+app.get('/kayit', (req, res) => {
+  res.send(injectMeta('Kayıt Ol – Demlik', 'Demlik\'e ücretsiz kaydol, konular yaz ve e-kitap oluştur.', `${SITE_URL}/kayit`, ''));
+});
+app.get('/forum', (req, res) => {
+  const tag = req.query.tag || '';
+  const title = tag ? `${tag} Konuları – Demlik` : 'Konular – Demlik';
+  const desc = tag ? `Demlik\'te ${tag} etiketli konuları keşfet.` : 'Demlik topluluğunun konularını keşfet, tartışmalara katıl.';
+  res.send(injectMeta(title, desc, `${SITE_URL}/forum${tag ? '?tag=' + encodeURIComponent(tag) : ''}`, ''));
+});
+app.get('/kitaplar', (req, res) => {
+  res.send(injectMeta('E-Kitaplar – Demlik', 'Demlik yazarlarının e-kitaplarını oku veya kendi kitabını oluştur.', `${SITE_URL}/kitaplar`, ''));
+});
+app.get('/gruplar', (req, res) => {
+  res.send(injectMeta('Gruplar – Demlik', 'Demlik\'teki gruplara katıl ya da kendi grubunu kur.', `${SITE_URL}/gruplar`, ''));
+});
+app.get('/ayarlar', (req, res) => {
+  res.send(injectMeta('Ayarlar – Demlik', 'Profil, şifre ve hesap ayarlarını düzenle.', `${SITE_URL}/ayarlar`, ''));
+});
+
 app.get('/forum/:slug', (req, res) => {
   const forum = db.prepare('SELECT * FROM forums WHERE slug=?').get(req.params.slug);
   if (!forum) return res.sendFile(path.join(__dirname, 'public', 'index.html'));

@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Demlik</title>
-  <meta name="description" content="Fikirlerin buluştuğu, hikayelerin yeşerdiği topluluk platformu. Konular, kitaplar ve gruplar ile topluluğa katıl." />
+  <meta name="description" content="Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur." />
   <link rel="canonical" href="https://demlikforum.up.railway.app" />
 
   <!-- Open Graph -->
   <meta property="og:site_name" content="Demlik" />
-  <meta property="og:title" content="Demlik – Topluluk Platformu" />
-  <meta property="og:description" content="Fikirlerin buluştuğu, hikayelerin yeşerdiği topluluk platformu. Konular, kitaplar ve gruplar." />
+  <meta property="og:title" content="Demlik – Çay kadar sıcak sohbet ortamı" />
+  <meta property="og:description" content="Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://demlikforum.up.railway.app" />
   <meta property="og:image" content="https://demlikforum.up.railway.app/demlik.png" />
@@ -20,8 +20,8 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Demlik – Topluluk Platformu" />
-  <meta name="twitter:description" content="Fikirlerin buluştuğu, hikayelerin yeşerdiği topluluk platformu." />
+  <meta name="twitter:title" content="Demlik – Çay kadar sıcak sohbet ortamı" />
+  <meta name="twitter:description" content="Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur." />
   <meta name="twitter:image" content="https://demlikforum.up.railway.app/demlik.png" />
 
   <!-- Schema.org JSON-LD -->
@@ -30,12 +30,41 @@
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Demlik",
+    "alternateName": "Demlik – Çay kadar sıcak sohbet ortamı",
     "url": "https://demlikforum.up.railway.app",
-    "description": "Fikirlerin buluştuğu, hikayelerin yeşerdiği topluluk platformu.",
+    "description": "Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur.",
     "potentialAction": {
       "@type": "SearchAction",
       "target": "https://demlikforum.up.railway.app/forum?q={search_term_string}",
       "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SiteLinksSearchBox",
+    "url": "https://demlikforum.up.railway.app",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://demlikforum.up.railway.app/forum?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Demlik",
+    "url": "https://demlikforum.up.railway.app",
+    "logo": "https://demlikforum.up.railway.app/demlik.png",
+    "description": "Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur.",
+    "sameAs": [],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "customer support",
+      "url": "https://demlikforum.up.railway.app/giris"
     }
   }
   </script>
@@ -121,6 +150,15 @@
   <footer style="text-align:center;padding:20px;font-size:12px;color:#525252;border-top:1px solid rgba(220,38,38,0.1);margin-top:40px">
     Created By. İsmail DEMİRCAN &nbsp;&#169;&nbsp;Copyright 2026
   </footer>
+
+  <!-- MOBİL BOTTOM BAR -->
+  <nav class="mobile-bottom-bar" id="mobile-bottom-bar">
+    <a href="/" data-link id="mbb-home"><i class="fas fa-home"></i>Ana Sayfa</a>
+    <a href="/forum" data-link id="mbb-forum"><i class="fas fa-comments"></i>Konular</a>
+    <a href="/kitaplar" data-link id="mbb-books"><i class="fas fa-book"></i>Kitaplar</a>
+    <a href="/gruplar" data-link id="mbb-groups"><i class="fas fa-users"></i>Gruplar</a>
+    <a href="/giris" data-link id="mbb-auth"><i class="fas fa-user"></i><span id="mbb-auth-label">Giriş</span></a>
+  </nav>
 
   <script src="app.js"></script>
 </body>
