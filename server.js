@@ -231,18 +231,22 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 async function handleUpload(file) {
   if (USE_CLOUDINARY) {
     return new Promise((resolve, reject) => {
+      if (!file.buffer || file.buffer.length === 0) {
+        return reject(new Error('Dosya buffer boş'));
+      }
       const ext = path.extname(file.originalname).replace('.', '') || 'jpg';
       const public_id = 'demlik/' + uuidv4();
-      cloudinary.uploader.upload_stream(
-        { public_id, resource_type: 'image', format: ext, quality: 'auto', fetch_format: 'auto' },
+      const stream = cloudinary.uploader.upload_stream(
+        { public_id, resource_type: 'image', quality: 'auto', fetch_format: 'auto' },
         (err, result) => {
-          if (err) reject(err);
-          else resolve(result.secure_url);
+          if (err) return reject(new Error('Cloudinary yükleme hatası: ' + (err.message || JSON.stringify(err))));
+          if (!result?.secure_url) return reject(new Error('Cloudinary URL alınamadı'));
+          resolve(result.secure_url);
         }
-      ).end(file.buffer);
+      );
+      stream.end(file.buffer);
     });
   } else {
-    // Disk'e kaydet (zaten multer yazdı)
     return '/uploads/' + file.filename;
   }
 }
@@ -1406,7 +1410,8 @@ app.get('/api/conversations', authMiddleware, async (req, res) => {
       (SELECT content FROM dm_messages WHERE conversation_id=c.id AND deleted_for_all=0 ORDER BY created_at DESC LIMIT 1) as last_message,
       (SELECT COUNT(*) FROM dm_messages WHERE conversation_id=c.id AND sender_id!=$1 AND 
         CASE WHEN c.user1_id=$1 THEN deleted_by_receiver=0 ELSE deleted_by_sender=0 END
-        AND id > COALESCE((SELECT MAX(id) FROM dm_messages WHERE conversation_id=c.id AND sender_id=$1),0)
+        AND deleted_for_all=0
+        AND id > CASE WHEN c.user1_id=$1 THEN COALESCE(c.read_until_user1,0) ELSE COALESCE(c.read_until_user2,0) END
       ) as unread_count
     FROM dm_conversations c
     JOIN users u1 ON c.user1_id=u1.id
@@ -1425,15 +1430,15 @@ app.get('/api/conversations/unread-count', authMiddleware, async (req, res) => {
     AND EXISTS (
       SELECT 1 FROM dm_messages m WHERE m.conversation_id=c.id AND m.sender_id!=$1
       AND CASE WHEN c.user1_id=$1 THEN m.deleted_by_receiver=0 ELSE m.deleted_by_sender=0 END
-      AND m.id > COALESCE((SELECT MAX(m2.id) FROM dm_messages m2 WHERE m2.conversation_id=c.id AND m2.sender_id=$1),0)
+      AND m.deleted_for_all=0
+      AND m.id > CASE WHEN c.user1_id=$1 THEN COALESCE(c.read_until_user1,0) ELSE COALESCE(c.read_until_user2,0) END
     )
   `, [uid]);
   res.json({ count: parseInt(rows[0].c) });
 });
 
 app.get('/api/conversation/:username', authMiddleware, async (req, res) => {
-  const { rows: target } = await query('SELECT id,username,avatar,name_color FROM users WHERE username=$1', [req.params.username]);
-  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const { rows: target } = await query('SELECT id,username,avatar,name_color FROM users WHERE username=$1', [req.params.username]);  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
   const other = target[0];
   const uid = req.user.id;
   const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
@@ -1461,6 +1466,17 @@ app.get('/api/conversation/:username', authMiddleware, async (req, res) => {
       AND ($2=1 OR m.deleted_by_receiver=0 OR m.sender_id=$3)
     ORDER BY m.created_at ASC
   `, [conv.id, 0, uid]);
+
+  // Konuşma açılınca read_until güncelle (son mesaj ID'si)
+  if (msgs.length) {
+    const lastId = msgs[msgs.length - 1].id;
+    if (isUser1) {
+      await query('UPDATE dm_conversations SET read_until_user1=$1 WHERE id=$2 AND read_until_user1 < $1', [lastId, conv.id]);
+    } else {
+      await query('UPDATE dm_conversations SET read_until_user2=$1 WHERE id=$2 AND read_until_user2 < $1', [lastId, conv.id]);
+    }
+  }
+
   res.json({ conv, other, messages: msgs, isHidden, hasPassword: !!hiddenPass });
 });
 

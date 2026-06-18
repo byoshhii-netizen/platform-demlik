@@ -278,21 +278,15 @@ async function renderHome(app) {
   document.title = 'Demlik – Topluluk Platformu';
   updatePageMeta('Demlik – Topluluk Platformu', 'Çay kadar sıcak topluluk platformu.', '');
   app.innerHTML = `
-    <div class="hero">
-      <div class="hero-content">
-        <div class="hero-title">DEMLİK</div>
-        <p class="hero-subtitle">Çay kadar sıcak topluluk platformu.</p>
-        <div class="hero-buttons">
-          <a href="/forum" data-link class="btn btn-primary btn-lg"><i class="fas fa-comments"></i> Konulara Gir</a>
-          <a href="/kitaplar" data-link class="btn btn-outline btn-lg"><i class="fas fa-book-open"></i> Kitapları Keşfet</a>
-        </div>
-      </div>
-    </div>
     <div class="container page">
       <div class="section">
-        <div class="section-header">
-          <div class="section-title"><div class="section-title-bar"></div>Son Konular</div>
-          <a href="/forum" data-link class="btn btn-ghost btn-sm">Tümü <i class="fas fa-arrow-right"></i></a>
+        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+          <div><div class="page-title">Son Konular</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <div class="search-bar" style="margin:0;flex:1;min-width:180px"><i class="fas fa-search"></i><input type="text" id="home-forum-search" placeholder="Konu ara..." /></div>
+            ${currentUser ? `<button class="btn btn-primary btn-sm" id="home-new-forum-btn"><i class="fas fa-plus"></i> Yeni Konu</button>` : ''}
+            <a href="/forum" data-link class="btn btn-ghost btn-sm">Tümü <i class="fas fa-arrow-right"></i></a>
+          </div>
         </div>
         <div id="home-forums"><div class="loading-center"><div class="spinner"></div></div></div>
       </div>
@@ -305,17 +299,29 @@ async function renderHome(app) {
       </div>
     </div>`;
 
+  if (currentUser) $('#home-new-forum-btn')?.addEventListener('click', () => showNewForumModal());
+
+  let allForums = [];
   try {
-    const forums = await api('/forums');
+    allForums = await api('/forums');
     const el = $('#home-forums');
-    if (!forums.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>Henüz konu yok.</p></div>'; }
-    else el.innerHTML = forums.slice(0, 5).map(f => forumCardHTML(f)).join('');
+    if (!allForums.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>Henüz konu yok.</p></div>'; }
+    else el.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${allForums.slice(0, 10).map(f => forumCardHTML(f)).join('')}</div>`;
   } catch {}
+
+  $('#home-forum-search')?.addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    const filtered = allForums.filter(f => f.title.toLowerCase().includes(q) || f.content.toLowerCase().includes(q));
+    const el = $('#home-forums');
+    if (!el) return;
+    if (!filtered.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>Konu bulunamadı.</p></div>'; return; }
+    el.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${filtered.map(f => forumCardHTML(f)).join('')}</div>`;
+  });
 
   try {
     const books = await api('/books');
     const el = $('#home-books');
-    if (!books.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-books"></i><p>Henüz kitap yok.</p></div>'; }
+    if (!books.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-book"></i><p>Henüz kitap yok.</p></div>'; }
     else el.innerHTML = books.slice(0, 6).map(b => bookCardHTML(b)).join('');
   } catch {}
 }
@@ -441,13 +447,50 @@ function showNewForumModal(existing = null) {
     const customTagsInput = $('#fm-custom-tags').value.trim();
     const customTags = customTagsInput ? customTagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
     
+    const submitBtn = $('#fm-submit');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;margin-right:6px"></div> Yükleniyor...';
+
     try {
       let banner_image = existing ? (existing.banner_image || '') : '';
       const bannerFile = $('#fm-banner-file').files[0];
       if (bannerFile) {
-        const fd = new FormData(); fd.append('file', bannerFile);
-        const r = await apiForm('/upload', fd);
-        banner_image = r.url;
+        // Progress göster
+        const progressWrap = document.createElement('div');
+        progressWrap.id = 'fm-upload-progress';
+        progressWrap.style.cssText = 'margin:8px 0;background:var(--bg-card2);border-radius:8px;overflow:hidden;height:6px';
+        progressWrap.innerHTML = '<div id="fm-progress-bar" style="height:100%;background:var(--grad-red);width:0%;transition:width 0.3s"></div>';
+        $('#fm-error').insertAdjacentElement('beforebegin', progressWrap);
+        
+        // XMLHttpRequest ile progress takibi
+        banner_image = await new Promise((resolve, reject) => {
+          const fd = new FormData();
+          fd.append('file', bannerFile);
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener('progress', e => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 90);
+              const bar = $('#fm-progress-bar');
+              if (bar) bar.style.width = pct + '%';
+            }
+          });
+          xhr.addEventListener('load', () => {
+            const bar = $('#fm-progress-bar');
+            if (bar) bar.style.width = '100%';
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (xhr.status >= 400) return reject(new Error(data.error || 'Yükleme hatası'));
+              resolve(data.url);
+            } catch (e) {
+              reject(new Error('Sunucu yanıtı geçersiz: ' + xhr.responseText.substring(0, 100)));
+            }
+          });
+          xhr.addEventListener('error', () => reject(new Error('Ağ hatası, tekrar deneyin')));
+          xhr.open('POST', '/api/upload');
+          const token = localStorage.getItem('token');
+          if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+          xhr.send(fd);
+        });
       }
       if (existing) {
         await api('/forum/' + existing.slug, { method: 'PUT', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags }) });
@@ -462,7 +505,13 @@ function showNewForumModal(existing = null) {
       hideModal();
       navigate(location.pathname, false);
       renderRoute(location.pathname);
-    } catch (e) { $('#fm-error').textContent = e.message; }
+    } catch (e) {
+      $('#fm-error').textContent = e.message;
+      const submitBtn = $('#fm-submit');
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = existing ? 'Güncelle' : 'Yayınla'; }
+      const prog = $('#fm-upload-progress');
+      if (prog) prog.remove();
+    }
   });
 }
 
@@ -1927,6 +1976,17 @@ async function renderDMChat(username) {
   let data;
   try { data = await api(`/conversation/${encodeURIComponent(username)}`); }
   catch (e) { mainEl.innerHTML = `<div class="dm-empty"><p style="color:var(--accent-red2)">${e.message}</p></div>`; return; }
+
+  // Mesajlar okundu → badge'i hemen güncelle
+  setTimeout(() => checkUnreadMessages(), 300);
+
+  // Sidebar'daki bu konuşmanın unread badge'ini kaldır
+  const convItem = $(`.dm-conv-item[data-username="${CSS.escape(username)}"]`);
+  if (convItem) {
+    convItem.classList.remove('dm-unread');
+    const badge = convItem.querySelector('.dm-unread-badge');
+    if (badge) badge.remove();
+  }
 
   const { conv, other, messages, isHidden, hasPassword } = data;
   if (isHidden) {
