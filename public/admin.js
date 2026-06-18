@@ -96,7 +96,7 @@ function loadSection(section) {
   currentSection = section;
   const main = $('#admin-main');
   main.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
-  const map = { users: renderUsers, forums: renderForums, books: renderBooks, groups: renderGroups, levels: renderLevels, tags: renderTags, logs: renderLogs, settings: renderSettings };
+  const map = { users: renderUsers, forums: renderForums, books: renderBooks, groups: renderGroups, levels: renderLevels, tags: renderTags, logs: renderLogs, settings: renderSettings, messages: renderAdminMessages };
   if (map[section]) map[section](main);
 }
 
@@ -817,4 +817,63 @@ async function renderSettings(main) {
       $('#footer-msg').style.color = '#4ade80'; $('#footer-msg').textContent = 'Kaydedildi ✓';
     } catch (e) { $('#footer-msg').textContent = e.message; }
   });
+}
+
+async function renderAdminMessages(main) {
+  let convs = [];
+  try { convs = await adminApi('/conversations'); } catch (e) { main.innerHTML = `<p style="color:var(--accent-red2)">${e.message}</p>`; return; }
+
+  main.innerHTML = `
+    <div class="section-bar">
+      <div class="page-title" style="margin:0">Mesajlar <span style="font-size:14px;color:var(--text-muted)">(${convs.length})</span></div>
+      <input type="text" id="msg-search" placeholder="Kullanıcı ara..." style="max-width:220px" />
+    </div>
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:16px;height:600px">
+      <div class="card" style="overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Konuşmalar</div>
+        <div id="admin-conv-list" style="overflow-y:auto;flex:1">
+          ${convs.map(c => `<div class="admin-conv-item" data-id="${c.id}" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(220,38,38,0.05);transition:background 0.15s" onmouseover="this.style.background='var(--bg-card2)'" onmouseout="this.style.background=''">
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary)">${escHtml(c.user1)} ↔ ${escHtml(c.user2)}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${c.message_count} mesaj · ${timeAgo(c.last_message_at)}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="card" id="admin-msg-view" style="overflow:hidden;display:flex;flex-direction:column">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px">Bir konuşma seçin</div>
+      </div>
+    </div>`;
+
+  $('#msg-search')?.addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    $$('.admin-conv-item').forEach(el => {
+      el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+
+  $$('.admin-conv-item').forEach(el => {
+    el.addEventListener('click', async () => {
+      $$('.admin-conv-item').forEach(x => x.style.fontWeight = 'normal');
+      el.style.fontWeight = '700';
+      const view = $('#admin-msg-view');
+      view.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+      try {
+        const msgs = await adminApi(`/conversations/${el.dataset.id}/messages`);
+        view.innerHTML = `<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-muted);flex-shrink:0">${msgs.length} mesaj</div>
+          <div style="flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+            ${msgs.map(m => `<div style="display:flex;gap:8px;align-items:flex-start${m.deleted_for_all ? ';opacity:0.5' : ''}">
+              <span style="font-size:11px;color:var(--text-muted);width:80px;flex-shrink:0">${escHtml(m.sender_username)}</span>
+              <div style="flex:1;background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;color:${m.deleted_for_all ? 'var(--text-muted)' : 'var(--text-primary)'};word-break:break-word">
+                ${m.deleted_for_all ? '<i>Silindi</i>' : escHtml(m.content || (m.image_url ? '📷 Fotoğraf' : ''))}
+              </div>
+              <span style="font-size:10px;color:var(--text-muted);flex-shrink:0">${timeAgo(m.created_at)}</span>
+            </div>`).join('')}
+          </div>`;
+      } catch (e) { view.innerHTML = `<p style="color:var(--accent-red2);padding:16px">${e.message}</p>`; }
+    });
+  });
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

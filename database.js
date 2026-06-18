@@ -243,6 +243,64 @@ async function initDb() {
       ip TEXT DEFAULT '',
       created_at TIMESTAMP DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS friendships (
+      id BIGSERIAL PRIMARY KEY,
+      requester_id BIGINT NOT NULL,
+      addressee_id BIGINT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(requester_id, addressee_id),
+      FOREIGN KEY(requester_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(addressee_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS blocks (
+      id BIGSERIAL PRIMARY KEY,
+      blocker_id BIGINT NOT NULL,
+      blocked_id BIGINT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(blocker_id, blocked_id),
+      FOREIGN KEY(blocker_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(blocked_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS dm_conversations (
+      id BIGSERIAL PRIMARY KEY,
+      user1_id BIGINT NOT NULL,
+      user2_id BIGINT NOT NULL,
+      hidden_by_user1 INTEGER DEFAULT 0,
+      hidden_by_user2 INTEGER DEFAULT 0,
+      hidden_pass_user1 TEXT DEFAULT '',
+      hidden_pass_user2 TEXT DEFAULT '',
+      last_message_at TIMESTAMP DEFAULT NOW(),
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(user1_id, user2_id),
+      FOREIGN KEY(user1_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(user2_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS dm_messages (
+      id BIGSERIAL PRIMARY KEY,
+      conversation_id BIGINT NOT NULL,
+      sender_id BIGINT NOT NULL,
+      content TEXT DEFAULT '',
+      image_url TEXT DEFAULT '',
+      shared_forum_id BIGINT,
+      reply_to_id BIGINT,
+      deleted_by_sender INTEGER DEFAULT 0,
+      deleted_by_receiver INTEGER DEFAULT 0,
+      deleted_for_all INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY(conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(shared_forum_id) REFERENCES forums(id) ON DELETE SET NULL,
+      FOREIGN KEY(reply_to_id) REFERENCES dm_messages(id) ON DELETE SET NULL
+    );
+
+    ALTER TABLE forums ADD COLUMN IF NOT EXISTS allow_sharing INTEGER DEFAULT 1;
+    ALTER TABLE forums ADD COLUMN IF NOT EXISTS share_count INTEGER DEFAULT 0;
   `);
 
   // Seed default levels

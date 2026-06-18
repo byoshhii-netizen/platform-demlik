@@ -168,10 +168,17 @@ async function updateUserLevel(userId) {
     const minB  = lv.min_books      >= 9999999 ? Infinity : (parseInt(lv.min_books)      || 0);
     const minC  = lv.min_comments   >= 9999999 ? Infinity : (parseInt(lv.min_comments)   || 0);
     const minBP = (parseInt(lv.min_book_pages) || 0) >= 9999999 ? Infinity : (parseInt(lv.min_book_pages) || 0);
-    const reqAny = lv.require_any == 1;
-    const meets = reqAny
-      ? (user.forum_count >= minF || user.book_count >= minB || user.comment_count >= minC || bookPageCount >= minBP)
-      : (user.forum_count >= minF && user.book_count >= minB && user.comment_count >= minC && bookPageCount >= minBP);
+
+    // Yeni mantık:
+    // - Konu tek başına yeterli (min_forums karşılandıysa ✓)
+    // - Yorum tek başına yeterli (min_comments karşılandıysa ✓)
+    // - Kitap + sayfa ikisi birlikte (min_books VE min_book_pages birlikte karşılanmalı)
+    const meetsForums   = user.forum_count   >= minF;
+    const meetsComments = user.comment_count >= minC;
+    const meetsBook     = user.book_count    >= minB && bookPageCount >= minBP;
+
+    // Herhangi biri yeterliyse seviyeyi karşılamış sayılır
+    const meets = meetsForums || meetsComments || meetsBook;
     if (meets) bestLevel = lv;
   }
   await query('UPDATE users SET level_id=$1 WHERE id=$2', [bestLevel.id, userId]);
@@ -1211,6 +1218,9 @@ app.get('/forum', (req, res) => {
 app.get('/kitaplar', (req, res) => res.send(injectMeta('E-Kitaplar – Demlik', "Demlik yazarlarının e-kitaplarını oku.", `${SITE_URL}/kitaplar`, '')));
 app.get('/gruplar', (req, res) => res.send(injectMeta('Gruplar – Demlik', "Demlik'teki gruplara katıl.", `${SITE_URL}/gruplar`, '')));
 app.get('/ayarlar', (req, res) => res.send(injectMeta('Ayarlar – Demlik', 'Hesap ayarlarını düzenle.', `${SITE_URL}/ayarlar`, '')));
+app.get('/mesajlar', (req, res) => res.send(injectMeta('Mesajlar – Demlik', 'Özel mesajlarınız.', `${SITE_URL}/mesajlar`, '')));
+app.get('/mesajlar/:username', (req, res) => res.send(injectMeta('Mesajlar – Demlik', 'Özel mesajlarınız.', `${SITE_URL}/mesajlar/${req.params.username}`, '')));
+app.get('/arkadaslar', (req, res) => res.send(injectMeta('Arkadaşlar – Demlik', 'Arkadaş listesi.', `${SITE_URL}/arkadaslar`, '')));
 
 app.get('/forum/:slug', async (req, res) => {
   const { rows } = await query('SELECT * FROM forums WHERE slug=$1', [req.params.slug]);
@@ -1293,6 +1303,353 @@ app.get('/profil/:username', async (req, res) => {
     <meta property="og:site_name" content="Demlik" />
     ${imgTag}`;
   res.send(html.replace('<title>Demlik</title>', meta));
+});
+
+
+// ===== KULLANICI ARAMA =====
+app.get('/api/search/users', async (req, res) => {
+  const q = req.query.q;
+  if (!q || q.length < 2) return res.json([]);
+  const { rows } = await query(`SELECT id, username, avatar, name_color FROM users WHERE username ILIKE $1 AND banned=0 LIMIT 20`, [`%${q}%`]);
+  res.json(rows);
+});
+
+// ===== ARKADAŞLIK =====
+app.get('/api/friends', authMiddleware, async (req, res) => {
+  const uid = req.user.id;
+  const { rows } = await query(`
+    SELECT f.*, 
+      CASE WHEN f.requester_id=$1 THEN f.addressee_id ELSE f.requester_id END as other_id,
+      CASE WHEN f.requester_id=$1 THEN u2.username ELSE u1.username END as other_username,
+      CASE WHEN f.requester_id=$1 THEN u2.avatar ELSE u1.avatar END as other_avatar,
+      CASE WHEN f.requester_id=$1 THEN u2.name_color ELSE u1.name_color END as other_name_color
+    FROM friendships f
+    LEFT JOIN users u1 ON f.requester_id=u1.id
+    LEFT JOIN users u2 ON f.addressee_id=u2.id
+    WHERE (f.requester_id=$1 OR f.addressee_id=$1)
+  `, [uid]);
+  res.json(rows);
+});
+
+app.post('/api/friends/request/:username', authMiddleware, async (req, res) => {
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const targetId = target[0].id;
+  if (targetId == req.user.id) return res.status(400).json({ error: 'Kendinize istek gönderemezsiniz' });
+  // Engel kontrolü
+  const { rows: blk } = await query('SELECT id FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)', [req.user.id, targetId]);
+  if (blk.length) return res.status(403).json({ error: 'Bu kullanıcıyla işlem yapılamaz' });
+  const { rows: ex } = await query('SELECT * FROM friendships WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)', [req.user.id, targetId]);
+  if (ex.length) return res.status(400).json({ error: 'Zaten istek gönderilmiş veya arkadaşsınız' });
+  await query('INSERT INTO friendships (requester_id, addressee_id, status) VALUES ($1,$2,$3)', [req.user.id, targetId, 'pending']);
+  res.json({ ok: true });
+});
+
+app.post('/api/friends/respond/:id', authMiddleware, async (req, res) => {
+  const { action } = req.body; // accept | reject
+  const { rows } = await query('SELECT * FROM friendships WHERE id=$1 AND addressee_id=$2', [req.params.id, req.user.id]);
+  if (!rows.length) return res.status(404).json({ error: 'İstek bulunamadı' });
+  if (action === 'accept') {
+    await query("UPDATE friendships SET status='accepted', updated_at=NOW() WHERE id=$1", [rows[0].id]);
+  } else {
+    await query('DELETE FROM friendships WHERE id=$1', [rows[0].id]);
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/friends/:id', authMiddleware, async (req, res) => {
+  await query('DELETE FROM friendships WHERE id=$1 AND (requester_id=$2 OR addressee_id=$2)', [req.params.id, req.user.id]);
+  res.json({ ok: true });
+});
+
+// ===== ENGELLEME =====
+app.post('/api/block/:username', authMiddleware, async (req, res) => {
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const targetId = target[0].id;
+  if (targetId == req.user.id) return res.status(400).json({ error: 'Kendinizi engelleyemezsiniz' });
+  // Arkadaşlığı sil
+  await query('DELETE FROM friendships WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1)', [req.user.id, targetId]);
+  await query('INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [req.user.id, targetId]);
+  res.json({ ok: true });
+});
+
+app.delete('/api/block/:username', authMiddleware, async (req, res) => {
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  await query('DELETE FROM blocks WHERE blocker_id=$1 AND blocked_id=$2', [req.user.id, target[0].id]);
+  res.json({ ok: true });
+});
+
+app.get('/api/blocks', authMiddleware, async (req, res) => {
+  const { rows } = await query(`
+    SELECT b.*, u.username, u.avatar FROM blocks b
+    JOIN users u ON b.blocked_id=u.id
+    WHERE b.blocker_id=$1 ORDER BY b.created_at DESC
+  `, [req.user.id]);
+  res.json(rows);
+});
+
+// ===== MESAJLAR (DM) =====
+app.get('/api/conversations', authMiddleware, async (req, res) => {
+  const uid = req.user.id;
+  const { rows } = await query(`
+    SELECT c.*,
+      CASE WHEN c.user1_id=$1 THEN u2.username ELSE u1.username END as other_username,
+      CASE WHEN c.user1_id=$1 THEN u2.avatar ELSE u1.avatar END as other_avatar,
+      CASE WHEN c.user1_id=$1 THEN u2.id ELSE u1.id END as other_id,
+      CASE WHEN c.user1_id=$1 THEN u2.name_color ELSE u1.name_color END as other_name_color,
+      (SELECT content FROM dm_messages WHERE conversation_id=c.id AND deleted_for_all=0 ORDER BY created_at DESC LIMIT 1) as last_message,
+      (SELECT COUNT(*) FROM dm_messages WHERE conversation_id=c.id AND sender_id!=$1 AND 
+        CASE WHEN c.user1_id=$1 THEN deleted_by_receiver=0 ELSE deleted_by_sender=0 END
+        AND id > COALESCE((SELECT MAX(id) FROM dm_messages WHERE conversation_id=c.id AND sender_id=$1),0)
+      ) as unread_count
+    FROM dm_conversations c
+    JOIN users u1 ON c.user1_id=u1.id
+    JOIN users u2 ON c.user2_id=u2.id
+    WHERE (c.user1_id=$1 AND c.hidden_by_user1=0) OR (c.user2_id=$1 AND c.hidden_by_user2=0)
+    ORDER BY c.last_message_at DESC
+  `, [uid]);
+  res.json(rows);
+});
+
+app.get('/api/conversations/unread-count', authMiddleware, async (req, res) => {
+  const uid = req.user.id;
+  const { rows } = await query(`
+    SELECT COUNT(*) as c FROM dm_conversations c
+    WHERE ((c.user1_id=$1 AND c.hidden_by_user1=0) OR (c.user2_id=$1 AND c.hidden_by_user2=0))
+    AND EXISTS (
+      SELECT 1 FROM dm_messages m WHERE m.conversation_id=c.id AND m.sender_id!=$1
+      AND CASE WHEN c.user1_id=$1 THEN m.deleted_by_receiver=0 ELSE m.deleted_by_sender=0 END
+      AND m.id > COALESCE((SELECT MAX(m2.id) FROM dm_messages m2 WHERE m2.conversation_id=c.id AND m2.sender_id=$1),0)
+    )
+  `, [uid]);
+  res.json({ count: parseInt(rows[0].c) });
+});
+
+app.get('/api/conversation/:username', authMiddleware, async (req, res) => {
+  const { rows: target } = await query('SELECT id,username,avatar,name_color FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const other = target[0];
+  const uid = req.user.id;
+  const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
+  let { rows: convRows } = await query('SELECT * FROM dm_conversations WHERE user1_id=$1 AND user2_id=$2', [u1, u2]);
+  if (!convRows.length) {
+    const { rows: newConv } = await query('INSERT INTO dm_conversations (user1_id, user2_id) VALUES ($1,$2) RETURNING *', [u1, u2]);
+    convRows = newConv;
+  }
+  const conv = convRows[0];
+  const isUser1 = conv.user1_id == uid;
+  const isHidden = isUser1 ? conv.hidden_by_user1 : conv.hidden_by_user2;
+  const hiddenPass = isUser1 ? conv.hidden_pass_user1 : conv.hidden_pass_user2;
+  const { rows: msgs } = await query(`
+    SELECT m.*, 
+      u.username as sender_username, u.avatar as sender_avatar, u.name_color as sender_name_color,
+      f.title as forum_title, f.slug as forum_slug, f.banner_image as forum_banner,
+      r.content as reply_content, ru.username as reply_username
+    FROM dm_messages m
+    JOIN users u ON m.sender_id=u.id
+    LEFT JOIN forums f ON m.shared_forum_id=f.id
+    LEFT JOIN dm_messages r ON m.reply_to_id=r.id
+    LEFT JOIN users ru ON r.sender_id=ru.id
+    WHERE m.conversation_id=$1
+      AND ($2=1 OR m.deleted_by_sender=0 OR m.sender_id!=$3)
+      AND ($2=1 OR m.deleted_by_receiver=0 OR m.sender_id=$3)
+    ORDER BY m.created_at ASC
+  `, [conv.id, 0, uid]);
+  res.json({ conv, other, messages: msgs, isHidden, hasPassword: !!hiddenPass });
+});
+
+app.post('/api/conversation/:username/messages', authMiddleware, upload.single('image'), async (req, res) => {
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const other = target[0];
+  const uid = req.user.id;
+  // Engel kontrolü
+  const { rows: blk } = await query('SELECT id FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)', [uid, other.id]);
+  if (blk.length) return res.status(403).json({ error: 'Bu kullanıcıyla mesajlaşamazsınız' });
+  const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
+  let { rows: convRows } = await query('SELECT * FROM dm_conversations WHERE user1_id=$1 AND user2_id=$2', [u1, u2]);
+  if (!convRows.length) {
+    const { rows: nc } = await query('INSERT INTO dm_conversations (user1_id, user2_id) VALUES ($1,$2) RETURNING *', [u1, u2]);
+    convRows = nc;
+  }
+  const conv = convRows[0];
+  // Gizliliği aç (karşı taraftan mesaj geldi)
+  if (conv.user1_id == other.id && conv.hidden_by_user1) {
+    await query('UPDATE dm_conversations SET hidden_by_user1=0 WHERE id=$1', [conv.id]);
+  } else if (conv.user2_id == other.id && conv.hidden_by_user2) {
+    await query('UPDATE dm_conversations SET hidden_by_user2=0 WHERE id=$1', [conv.id]);
+  }
+  const { content, shared_forum_id, reply_to_id } = req.body;
+  let image_url = '';
+  if (req.file) {
+    try { image_url = await handleUpload(req.file); } catch (e) {}
+  }
+  if (!content && !image_url && !shared_forum_id) return res.status(400).json({ error: 'Mesaj boş olamaz' });
+  const { rows: msgRows } = await query(
+    'INSERT INTO dm_messages (conversation_id, sender_id, content, image_url, shared_forum_id, reply_to_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+    [conv.id, uid, content||'', image_url, shared_forum_id||null, reply_to_id||null]
+  );
+  await query('UPDATE dm_conversations SET last_message_at=NOW() WHERE id=$1', [conv.id]);
+  // Forum paylaşım sayısını artır
+  if (shared_forum_id) {
+    await query('UPDATE forums SET share_count=COALESCE(share_count,0)+1 WHERE id=$1', [shared_forum_id]);
+  }
+  const { rows: full } = await query(`
+    SELECT m.*, u.username as sender_username, u.avatar as sender_avatar, u.name_color as sender_name_color,
+      f.title as forum_title, f.slug as forum_slug, f.banner_image as forum_banner,
+      r.content as reply_content, ru.username as reply_username
+    FROM dm_messages m JOIN users u ON m.sender_id=u.id
+    LEFT JOIN forums f ON m.shared_forum_id=f.id
+    LEFT JOIN dm_messages r ON m.reply_to_id=r.id
+    LEFT JOIN users ru ON r.sender_id=ru.id
+    WHERE m.id=$1
+  `, [msgRows[0].id]);
+  res.json(full[0]);
+});
+
+app.post('/api/conversation/:username/hide', authMiddleware, async (req, res) => {
+  const { password } = req.body;
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const other = target[0];
+  const uid = req.user.id;
+  const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
+  const { rows: convRows } = await query('SELECT * FROM dm_conversations WHERE user1_id=$1 AND user2_id=$2', [u1, u2]);
+  if (!convRows.length) return res.status(404).json({ error: 'Konuşma bulunamadı' });
+  const conv = convRows[0];
+  const isUser1 = conv.user1_id == uid;
+  const passHash = password ? require('crypto').createHash('sha256').update(password).digest('hex') : '';
+  if (isUser1) {
+    await query('UPDATE dm_conversations SET hidden_by_user1=1, hidden_pass_user1=$1 WHERE id=$2', [passHash, conv.id]);
+  } else {
+    await query('UPDATE dm_conversations SET hidden_by_user2=1, hidden_pass_user2=$1 WHERE id=$2', [passHash, conv.id]);
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/conversation/:username/unhide', authMiddleware, async (req, res) => {
+  const { password } = req.body;
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const other = target[0];
+  const uid = req.user.id;
+  const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
+  const { rows: convRows } = await query('SELECT * FROM dm_conversations WHERE user1_id=$1 AND user2_id=$2', [u1, u2]);
+  if (!convRows.length) return res.status(404).json({ error: 'Konuşma bulunamadı' });
+  const conv = convRows[0];
+  const isUser1 = conv.user1_id == uid;
+  const storedHash = isUser1 ? conv.hidden_pass_user1 : conv.hidden_pass_user2;
+  if (storedHash) {
+    const inputHash = require('crypto').createHash('sha256').update(password||'').digest('hex');
+    if (inputHash !== storedHash) return res.status(403).json({ error: 'Yanlış şifre' });
+  }
+  if (isUser1) {
+    await query('UPDATE dm_conversations SET hidden_by_user1=0 WHERE id=$1', [conv.id]);
+  } else {
+    await query('UPDATE dm_conversations SET hidden_by_user2=0 WHERE id=$1', [conv.id]);
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/conversation/:username/set-password', authMiddleware, async (req, res) => {
+  const { password } = req.body;
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const other = target[0];
+  const uid = req.user.id;
+  const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
+  const { rows: convRows } = await query('SELECT * FROM dm_conversations WHERE user1_id=$1 AND user2_id=$2', [u1, u2]);
+  if (!convRows.length) return res.status(404).json({ error: 'Konuşma bulunamadı' });
+  const conv = convRows[0];
+  const isUser1 = conv.user1_id == uid;
+  const passHash = password ? require('crypto').createHash('sha256').update(password).digest('hex') : '';
+  if (isUser1) {
+    await query('UPDATE dm_conversations SET hidden_pass_user1=$1 WHERE id=$2', [passHash, conv.id]);
+  } else {
+    await query('UPDATE dm_conversations SET hidden_pass_user2=$1 WHERE id=$2', [passHash, conv.id]);
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/messages/:id', authMiddleware, async (req, res) => {
+  const { mode } = req.body; // 'me' | 'all'
+  const { rows } = await query('SELECT * FROM dm_messages WHERE id=$1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'Mesaj bulunamadı' });
+  const msg = rows[0];
+  const { rows: convRows } = await query('SELECT * FROM dm_conversations WHERE id=$1', [msg.conversation_id]);
+  if (!convRows.length) return res.status(404).json({ error: 'Konuşma bulunamadı' });
+  const conv = convRows[0];
+  const isOwn = msg.sender_id == req.user.id;
+  if (mode === 'all' && !isOwn) return res.status(403).json({ error: 'Sadece kendi mesajınızı herkesten silebilirsiniz' });
+  if (mode === 'all') {
+    await query('UPDATE dm_messages SET deleted_for_all=1 WHERE id=$1', [msg.id]);
+  } else {
+    if (msg.sender_id == req.user.id) {
+      await query('UPDATE dm_messages SET deleted_by_sender=1 WHERE id=$1', [msg.id]);
+    } else {
+      await query('UPDATE dm_messages SET deleted_by_receiver=1 WHERE id=$1', [msg.id]);
+    }
+  }
+  res.json({ ok: true });
+});
+
+app.post('/api/messages/delete-bulk', authMiddleware, async (req, res) => {
+  const { ids, mode } = req.body; // ids: array, mode: 'me'|'all'
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'ID listesi gerekli' });
+  for (const id of ids) {
+    const { rows } = await query('SELECT * FROM dm_messages WHERE id=$1', [id]);
+    if (!rows.length) continue;
+    const msg = rows[0];
+    const isOwn = msg.sender_id == req.user.id;
+    if (mode === 'all' && !isOwn) continue; // sadece kendi mesajlarını herkesten sil
+    if (mode === 'all') {
+      await query('UPDATE dm_messages SET deleted_for_all=1 WHERE id=$1', [id]);
+    } else {
+      if (isOwn) await query('UPDATE dm_messages SET deleted_by_sender=1 WHERE id=$1', [id]);
+      else await query('UPDATE dm_messages SET deleted_by_receiver=1 WHERE id=$1', [id]);
+    }
+  }
+  res.json({ ok: true });
+});
+
+app.delete('/api/conversation/:username', authMiddleware, async (req, res) => {
+  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const other = target[0];
+  const uid = req.user.id;
+  const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
+  const { rows: convRows } = await query('SELECT * FROM dm_conversations WHERE user1_id=$1 AND user2_id=$2', [u1, u2]);
+  if (!convRows.length) return res.status(404).json({ error: 'Konuşma bulunamadı' });
+  const conv = convRows[0];
+  const isUser1 = conv.user1_id == uid;
+  // Sadece kendi tarafından gizle (soft delete)
+  if (isUser1) await query('UPDATE dm_conversations SET hidden_by_user1=2 WHERE id=$1', [conv.id]);
+  else await query('UPDATE dm_conversations SET hidden_by_user2=2 WHERE id=$1', [conv.id]);
+  res.json({ ok: true });
+});
+
+// ===== ADMIN: MESAJLARI OKU =====
+app.get('/api/admin/conversations', adminMiddleware, async (req, res) => {
+  const { rows } = await query(`
+    SELECT c.id, u1.username as user1, u2.username as user2, c.last_message_at,
+      (SELECT COUNT(*) FROM dm_messages WHERE conversation_id=c.id) as message_count
+    FROM dm_conversations c
+    JOIN users u1 ON c.user1_id=u1.id
+    JOIN users u2 ON c.user2_id=u2.id
+    ORDER BY c.last_message_at DESC LIMIT 200
+  `);
+  res.json(rows);
+});
+
+app.get('/api/admin/conversations/:id/messages', adminMiddleware, async (req, res) => {
+  const { rows } = await query(`
+    SELECT m.*, u.username as sender_username
+    FROM dm_messages m JOIN users u ON m.sender_id=u.id
+    WHERE m.conversation_id=$1 ORDER BY m.created_at ASC
+  `, [req.params.id]);
+  res.json(rows);
 });
 
 app.get('*', (req, res) => {
