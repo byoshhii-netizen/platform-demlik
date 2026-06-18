@@ -37,8 +37,16 @@ body {
 
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: inherit; }
-img { max-width: 100%; height: auto; display: block; }
+img { max-width: 100%; height: auto; display: block; object-fit: contain; }
 * { box-sizing: border-box; min-width: 0; }
+
+/* Belirli resim tipleri için cover */
+.forum-detail-banner, .forum-card-banner, .book-cover img,
+.group-cover img, .nav-avatar, .comment-avatar,
+.chat-msg-avatar, .avatar-sm, .avatar-md, .member-avatar,
+.profile-avatar, .fdm-avatar {
+  object-fit: cover;
+}
 
 /* Global taşma önleme */
 #app, .container, .page, .card, .card-body,
@@ -539,9 +547,15 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   font-family: 'Georgia', serif;
   min-height: 500px;
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 @media (max-width: 600px) {
-  .ebook-page-content { padding: 28px 20px; }
+  .ebook-page-content { padding: 20px 16px; font-size: 15px; }
+  .ebook-reader { border-radius: 8px; }
+  .ebook-toolbar { padding: 10px 12px; }
 }
 .ebook-page-image {
   width: 100%;
@@ -963,8 +977,8 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
 }
 @media (max-width: 768px) {
   .fdm-bubble { width: calc(100vw - 24px); max-width: 100%; border-radius: 12px; }
-  #floating-dm { bottom: 72px; right: 8px; left: 8px; align-items: stretch; }
-  .fdm-toggle-btn { bottom: 72px; right: 16px; }
+  #floating-dm { display: none !important; }
+  .fdm-toggle-btn { display: none !important; }
 }
 
 /* ===== MOBİL TAŞMA - KAPSAMLI FİX ===== */
