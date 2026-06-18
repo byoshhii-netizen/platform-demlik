@@ -1767,7 +1767,7 @@ function renderSettingsSection(section) {
             <div style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">
               Spotify hesabını bağlayarak profilinde şu an dinlediğin müziği gösterebilirsin — tıpkı Discord gibi.
             </div>
-            <a href="/api/spotify/connect" class="btn btn-primary" style="background:linear-gradient(135deg,#1ED760,#17a84a);border:none;text-decoration:none">
+            <a href="#" id="spotify-connect-btn" class="btn btn-primary" style="background:linear-gradient(135deg,#1ED760,#17a84a);border:none;text-decoration:none">
               <i class="fab fa-spotify"></i> Spotify Hesabını Bağla
             </a>
           `}
@@ -1780,6 +1780,11 @@ function renderSettingsSection(section) {
         currentUser.spotify_show = $('#spotify-show-cb').checked ? 1 : 0;
         toast('Kaydedildi');
       } catch (e) { $('#spotify-msg').textContent = e.message; }
+    });
+    $('#spotify-connect-btn')?.addEventListener('click', e => {
+      e.preventDefault();
+      const token = localStorage.getItem('token');
+      if (token) window.location.href = '/api/spotify/connect-redirect?token=' + encodeURIComponent(token);
     });
     $('#spotify-disconnect')?.addEventListener('click', async () => {
       try {

@@ -1217,6 +1217,17 @@ app.get('/api/spotify/connect', authMiddleware, (req, res) => {
   res.redirect(url);
 });
 
+// Token'sız erişim için: token query param ile
+app.get('/api/spotify/connect-redirect', async (req, res) => {
+  const token = req.query.token;
+  if (!token) return res.redirect('/ayarlar?spotify=error');
+  const { rows } = await query('SELECT user_id FROM sessions WHERE token=$1', [token]);
+  if (!rows.length) return res.redirect('/ayarlar?spotify=error');
+  const scopes = 'user-read-currently-playing user-read-playback-state';
+  const url = `https://accounts.spotify.com/authorize?response_type=code&client_id=${SPOTIFY_CLIENT_ID}&scope=${encodeURIComponent(scopes)}&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT)}&state=${rows[0].user_id}`;
+  res.redirect(url);
+});
+
 app.get('/api/spotify/callback', async (req, res) => {
   const { code, state, error } = req.query;
   if (error) return res.redirect('/ayarlar?spotify=error');
