@@ -18,10 +18,14 @@ async function initDB() {
   try {
     await client.query('BEGIN');
 
+    // UUID extension
+    await client.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
+    await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+
     // Kullanıcılar tablosu
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         username VARCHAR(50) UNIQUE NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
@@ -45,7 +49,7 @@ async function initDB() {
     // Geliştirici başvuruları tablosu
     await client.query(`
       CREATE TABLE IF NOT EXISTS developer_applications (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         team_name VARCHAR(100) NOT NULL,
         first_name VARCHAR(50) NOT NULL,
@@ -67,7 +71,7 @@ async function initDB() {
     // Geliştirici profilleri
     await client.query(`
       CREATE TABLE IF NOT EXISTS developer_profiles (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         team_name VARCHAR(100) NOT NULL,
         first_name VARCHAR(50),
@@ -81,7 +85,7 @@ async function initDB() {
     // Oyun türleri
     await client.query(`
       CREATE TABLE IF NOT EXISTS game_genres (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         name VARCHAR(50) UNIQUE NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       )
@@ -99,7 +103,7 @@ async function initDB() {
     // Oyunlar tablosu
     await client.query(`
       CREATE TABLE IF NOT EXISTS games (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         developer_id UUID REFERENCES users(id) ON DELETE CASCADE,
         title VARCHAR(200) NOT NULL,
         description TEXT NOT NULL,
@@ -128,7 +132,7 @@ async function initDB() {
     // Kullanıcı kütüphanesi
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_library (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID REFERENCES users(id) ON DELETE CASCADE,
         game_id UUID REFERENCES games(id) ON DELETE CASCADE,
         is_installed BOOLEAN DEFAULT false,
@@ -144,7 +148,7 @@ async function initDB() {
     // Arkadaşlar
     await client.query(`
       CREATE TABLE IF NOT EXISTS friendships (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         requester_id UUID REFERENCES users(id) ON DELETE CASCADE,
         addressee_id UUID REFERENCES users(id) ON DELETE CASCADE,
         status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'blocked')),
@@ -156,7 +160,7 @@ async function initDB() {
     // Mesajlar
     await client.query(`
       CREATE TABLE IF NOT EXISTS messages (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
         receiver_id UUID REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
@@ -169,7 +173,7 @@ async function initDB() {
     // Engellenenler
     await client.query(`
       CREATE TABLE IF NOT EXISTS blocked_users (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         blocker_id UUID REFERENCES users(id) ON DELETE CASCADE,
         blocked_id UUID REFERENCES users(id) ON DELETE CASCADE,
         created_at TIMESTAMP DEFAULT NOW(),
@@ -180,7 +184,7 @@ async function initDB() {
     // Aile denetimi
     await client.query(`
       CREATE TABLE IF NOT EXISTS parental_controls (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
         is_enabled BOOLEAN DEFAULT false,
         parent_first_name VARCHAR(50),

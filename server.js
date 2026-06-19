@@ -14,8 +14,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
-  store: new pgSession({ pool, tableName: 'session' }),
-  secret: process.env.SESSION_SECRET,
+  store: new pgSession({
+    pool,
+    tableName: 'session',
+    createTableIfMissing: true
+  }),
+  secret: process.env.SESSION_SECRET || 'demlik_fallback_secret',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: false, httpOnly: true, maxAge: 30 * 24 * 60 * 60 * 1000 }
@@ -105,6 +109,17 @@ app.get('/api/ben', async (req, res) => {
 });
 
 // ==================== BAŞLAT ====================
+
+// Global hata yakalayıcı
+app.use((err, req, res, next) => {
+  console.error('Hata:', err.stack);
+  if (req.path.startsWith('/api/')) {
+    res.status(500).json({ error: 'Sunucu hatası' });
+  } else {
+    res.status(500).send('Sunucu hatası oluştu. Lütfen tekrar deneyin.');
+  }
+});
+
 initDB().then(() => {
-  app.listen(PORT, () => console.log(`🚀 Demlik Platform: http://localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`Demlik Platform: http://localhost:${PORT}`));
 }).catch(err => { console.error('Başlatma hatası:', err); process.exit(1); });
