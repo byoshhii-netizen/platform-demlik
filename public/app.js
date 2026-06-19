@@ -1,7 +1,7 @@
 ﻿let currentUser = null;
 let currentToken = localStorage.getItem('token');
 
-const SITE_URL = 'https://demlikforum.up.railway.app';
+const SITE_URL = 'https://demlik.up.railway.app';
 
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }

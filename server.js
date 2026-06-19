@@ -39,7 +39,7 @@ if (!USE_CLOUDINARY) app.use('/uploads', express.static(UPLOAD_DIR));
 // Cloudflare proxy arkasındaysa gerçek IP'yi al
 app.set('trust proxy', 1);
 
-const SITE_URL = process.env.SITE_URL || 'https://demlikforum.up.railway.app';
+const SITE_URL = process.env.SITE_URL || 'https://demlik.up.railway.app';
 
 // ===== RATE LIMITERS =====
 
@@ -1219,7 +1219,7 @@ app.post('/api/admin/user/:id/set-admin', adminMiddleware, async (req, res) => {
 // ===== SPOTİFY OAuth =====
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
-const SPOTIFY_REDIRECT = (process.env.SITE_URL || 'https://demlikforum.up.railway.app') + '/api/spotify/callback';
+const SPOTIFY_REDIRECT = (process.env.SITE_URL || 'https://demlik.up.railway.app') + '/api/spotify/callback';
 
 app.get('/api/spotify/connect', authMiddleware, (req, res) => {
   const scopes = 'user-read-currently-playing user-read-playback-state';
