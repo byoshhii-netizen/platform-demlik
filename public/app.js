@@ -102,7 +102,8 @@ function userDisplayName(u) {
   if (!u) return 'Silindi';
   const color = (u.show_level_color !== 0 && u.name_color) ? `style="color:${escHtml(u.name_color)}"` : '';
   const adminBadge = u.is_admin ? ` <i class="fas fa-shield-alt user-admin" title="Demlik Yetkilisi" data-admin-since="${escHtml(u.admin_since || '')}" style="color:#5865F2;cursor:pointer;font-size:13px"></i>` : '';
-  return `<span class="user-badge" ${color}>${escHtml(u.username)}${u.is_vip ? ' <i class="fas fa-gem user-vip" title="VIP"></i>' : ''}${u.is_plus ? ' <i class="fas fa-plus user-plus" title="Plus"></i>' : ''}${adminBadge}</span>`;
+  const titleBadge = u.title ? ` <span style="font-size:11px;color:var(--text-muted);font-weight:400"> · ${escHtml(u.title)}</span>` : '';
+  return `<span class="user-badge" ${color}>${escHtml(u.username)}${u.is_vip ? ' <i class="fas fa-gem user-vip" title="VIP"></i>' : ''}${u.is_plus ? ' <i class="fas fa-plus user-plus" title="Plus"></i>' : ''}${adminBadge}${titleBadge}</span>`;
 }
 
 function avatarImg(u, cls = 'avatar-sm') {
@@ -444,11 +445,14 @@ function showNewForumModal(existing = null) {
     const content = $('#fm-content').value.trim();
     if (!title || !content) { $('#fm-error').textContent = 'Başlık ve içerik zorunlu'; return; }
     
+    const submitBtn = $('#fm-submit');
+    if (submitBtn._submitting) return;
+    submitBtn._submitting = true;
+    
     const tagIds = Array.from($$('.fm-tag-check:checked')).map(cb => parseInt(cb.value));
     const customTagsInput = $('#fm-custom-tags').value.trim();
     const customTags = customTagsInput ? customTagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
     
-    const submitBtn = $('#fm-submit');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;display:inline-block;margin-right:6px"></div> Yükleniyor...';
 
@@ -509,7 +513,7 @@ function showNewForumModal(existing = null) {
     } catch (e) {
       $('#fm-error').textContent = e.message;
       const submitBtn = $('#fm-submit');
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = existing ? 'Güncelle' : 'Yayınla'; }
+      if (submitBtn) { submitBtn.disabled = false; submitBtn._submitting = false; submitBtn.innerHTML = existing ? 'Güncelle' : 'Yayınla'; }
       const prog = $('#fm-upload-progress');
       if (prog) prog.remove();
     }
@@ -563,15 +567,16 @@ async function renderForumDetail(app, slug) {
       <div class="forum-detail-header">
         <div class="forum-detail-title">${escHtml(forum.title)}</div>
         <div class="forum-detail-meta">
-          <span style="display:flex;align-items:center;gap:6px">
+          <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             ${avatarImg(forum, 'avatar-sm')}
             <a href="/profil/${escHtml(forum.username)}" data-link style="color:inherit">${userDisplayName(forum)}</a>
+            ${forum.user_title ? `<span style="font-size:11px;color:var(--accent-red2);font-weight:500">${escHtml(forum.user_title)}</span>` : ''}
+            ${forum.user_location ? `<span style="font-size:11px;color:var(--text-muted)"><i class="fas fa-map-marker-alt" style="font-size:10px"></i> ${escHtml(forum.user_location)}</span>` : ''}
           </span>
           <span><i class="fas fa-calendar" style="color:var(--accent-red)"></i> ${formatDate(forum.created_at)}</span>
           <span><i class="fas fa-eye" style="color:var(--accent-red)"></i> ${forum.views || 0} görüntülenme</span>
           ${forum.share_count ? `<span><i class="fas fa-share-alt" style="color:var(--accent-red)"></i> ${forum.share_count} iletildi</span>` : ''}
         </div>
-      </div>
       ${forum.banner_image ? `<img src="${escHtml(forum.banner_image)}" class="forum-detail-banner" alt="" />` : ''}
       <div class="forum-detail-content">${escHtml(forum.content)}</div>
       <div class="forum-actions">
@@ -1535,7 +1540,11 @@ async function renderProfile(app, username) {
         ${user.avatar ? `<img src="${escHtml(user.avatar)}" class="profile-avatar" alt="" />` : `<div class="profile-avatar-placeholder"><i class="fas fa-user"></i></div>`}
       </div>
       <div class="profile-info">
-        <div class="profile-username" style="${user.show_level_color && user.name_color ? 'color:' + escHtml(user.name_color) : ''}">${escHtml(user.username)} ${user.is_vip ? '<i class="fas fa-gem" style="color:#fbbf24;font-size:18px" title="VIP"></i>' : ''} ${user.is_plus ? '<i class="fas fa-plus-circle" style="color:#818cf8;font-size:18px" title="Plus"></i>' : ''}${level ? ` <i class="${escHtml(level.icon)}" style="color:${escHtml(level.color)};font-size:16px" title="${escHtml(level.name)}"></i> <span style="font-size:13px;font-weight:500;color:${escHtml(level.color)}">${escHtml(level.name)}</span>` : ''}</div>
+        <div class="profile-username" style="${user.show_level_color && user.name_color ? 'color:' + escHtml(user.name_color) : ''}">${escHtml(user.username)} ${user.is_vip ? '<i class="fas fa-gem" style="color:#fbbf24;font-size:18px" title="VIP"></i>' : ''} ${user.is_plus ? '<i class="fas fa-plus-circle" style="color:#818cf8;font-size:18px" title="Plus"></i>' : ''}${user.is_admin ? ` <i class="fas fa-shield-alt user-admin" title="Demlik Yetkilisi" data-admin-since="${escHtml(user.admin_since || '')}" style="color:#5865F2;cursor:pointer;font-size:16px"></i>` : ''}${level ? ` <i class="${escHtml(level.icon)}" style="color:${escHtml(level.color)};font-size:16px" title="${escHtml(level.name)}"></i> <span style="font-size:13px;font-weight:500;color:${escHtml(level.color)}">${escHtml(level.name)}</span>` : ''}</div>
+        ${user.title ? `<div style="font-size:13px;font-weight:600;color:var(--accent-red2);margin-top:4px"><i class="fas fa-briefcase" style="font-size:11px;margin-right:4px"></i>${escHtml(user.title)}</div>` : ''}
+        ${user.location ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px"><i class="fas fa-map-marker-alt" style="font-size:11px;margin-right:4px"></i>${escHtml(user.location)}</div>` : ''}
+        ${user.title ? `<div style="font-size:14px;color:var(--accent-red2);font-weight:600;margin-top:4px">${escHtml(user.title)}</div>` : ''}
+        ${user.location ? `<div style="font-size:13px;color:var(--text-muted);margin-top:2px"><i class="fas fa-map-marker-alt" style="font-size:11px;margin-right:4px"></i>${escHtml(user.location)}</div>` : ''}
         ${levelBadge}
         ${progressHTML}
         ${user.bio ? `<div class="profile-bio" style="margin-top:10px">${escHtml(user.bio)}</div>` : ''}
@@ -1628,6 +1637,12 @@ function renderSettingsSection(section) {
             </div>
           </div>
           <div class="form-group"><label>Biyografi</label><textarea id="s-bio" rows="3">${escHtml(currentUser.bio || '')}</textarea></div>
+          <div class="form-group"><label>Ünvan <span style="color:var(--accent-red2)">*</span></label><input type="text" id="s-title" placeholder="Örn: Yazar, Öğrenci, Mühendis..." value="${escHtml(currentUser.title || '')}" /></div>
+          <div class="form-group"><label>Konum (opsiyonel)</label><input type="text" id="s-location" placeholder="Örn: İstanbul, Türkiye" value="${escHtml(currentUser.location || '')}" /></div>
+          <div class="form-row">
+            <div class="form-group"><label>Ünvan <span style="color:var(--accent-red2)">*</span></label><input type="text" id="s-title" value="${escHtml(currentUser.title || '')}" placeholder="Örn: Yazılım Geliştirici, Öğrenci..." /></div>
+            <div class="form-group"><label>Konum <span style="color:var(--text-muted);font-size:11px">(opsiyonel)</span></label><input type="text" id="s-location" value="${escHtml(currentUser.location || '')}" placeholder="Örn: İstanbul, Türkiye" /></div>
+          </div>
           <div class="form-group">
             <label>Linkler</label>
             <div id="links-container" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px"></div>
@@ -1673,8 +1688,12 @@ function renderSettingsSection(section) {
     });
 
     $('#save-profile-btn').addEventListener('click', async () => {
+      const titleVal = ($('#s-title').value || '').trim();
+      if (!titleVal) { $('#profile-msg').textContent = 'Ünvan zorunlu'; return; }
       const fd = new FormData();
       fd.append('bio', $('#s-bio').value);
+      fd.append('title', titleVal);
+      fd.append('location', $('#s-location').value || '');
       const validLinks = currentLinks.filter(l => l.url && l.url.trim());
       fd.append('links', JSON.stringify(validLinks));
       const avatarFile = $('#avatar-file').files[0];
@@ -2047,6 +2066,8 @@ async function renderDMChat(username) {
 
   // Mesajlar okundu → badge'i hemen güncelle
   setTimeout(() => checkUnreadMessages(), 300);
+  // Karşı tarafın mesajlarını okundu işaretle
+  try { api(`/conversation/${encodeURIComponent(username)}/mark-read`, { method: 'POST' }); } catch {}
 
   // Sidebar'daki bu konuşmanın unread badge'ini kaldır
   const convItem = $(`.dm-conv-item[data-username="${CSS.escape(username)}"]`);
@@ -2271,6 +2292,7 @@ function dmMessageHTML(m, myId, selMode) {
           </div>`}
       <div class="dm-msg-meta">
         <span style="font-size:10px;color:var(--text-muted)">${timeAgo(m.created_at)}</span>
+        ${isOwn && !deleted ? `<span style="font-size:11px;margin-left:3px">${m.read_at ? '<i class="fas fa-check-double" style="color:#1ED760" title="Okundu"></i>' : '<i class="fas fa-check" style="color:var(--text-muted)" title="Gönderildi"></i>'}</span>` : ''}
         <button class="dm-msg-menu-btn" data-id="${m.id}" data-own="${isOwn ? 1 : 0}" style="background:none;color:var(--text-muted);font-size:12px;padding:0 4px;opacity:0;transition:opacity 0.15s"><i class="fas fa-ellipsis-h"></i></button>
       </div>
     </div>

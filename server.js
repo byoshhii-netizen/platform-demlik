@@ -225,7 +225,15 @@ const storage = USE_CLOUDINARY
         cb(null, uuidv4() + ext);
       }
     });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Sadece resim dosyaları kabul edilir (jpg, png, gif, webp)'));
+  }
+});
 
 // Yükleme helper'ı — Cloudinary ya da disk
 async function handleUpload(file) {
@@ -344,7 +352,8 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
 // ===== FORUMS =====
 app.get('/api/forums', async (req, res) => {
   const { rows } = await query(`
-    SELECT f.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus,
+    SELECT f.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.is_admin,
+      u.title as user_title, u.location as user_location,
       (SELECT COUNT(*) FROM forum_likes WHERE forum_id=f.id) as like_count,
       (SELECT COUNT(*) FROM forum_comments WHERE forum_id=f.id) as comment_count
     FROM forums f LEFT JOIN users u ON f.user_id=u.id
@@ -354,7 +363,8 @@ app.get('/api/forums', async (req, res) => {
 
 app.get('/api/forum/:slug', optionalAuth, async (req, res) => {
   const { rows } = await query(`
-    SELECT f.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.level_id,
+    SELECT f.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.level_id, u.is_admin,
+      u.title as user_title, u.location as user_location,
       (SELECT COUNT(*) FROM forum_likes WHERE forum_id=f.id) as like_count,
       (SELECT COUNT(*) FROM forum_comments WHERE forum_id=f.id) as comment_count
     FROM forums f LEFT JOIN users u ON f.user_id=u.id WHERE f.slug=$1`, [req.params.slug]);
@@ -923,7 +933,7 @@ app.get('/api/profile/:username', async (req, res) => {
 });
 
 app.put('/api/profile', authMiddleware, upload.single('avatar'), async (req, res) => {
-  const { bio, links, name_color, show_level_badge, show_level_color } = req.body;
+  const { bio, links, name_color, show_level_badge, show_level_color, title, location } = req.body;
   let newAvatar = req.user.avatar;
   if (req.file) {
     try {
@@ -933,11 +943,11 @@ app.put('/api/profile', authMiddleware, upload.single('avatar'), async (req, res
     }
   }
   const newLinks = links ? (typeof links === 'string' ? links : JSON.stringify(links)) : req.user.links;
-  await query('UPDATE users SET bio=$1,links=$2,name_color=$3,show_level_badge=$4,show_level_color=$5,avatar=$6 WHERE id=$7',
+  await query('UPDATE users SET bio=$1,links=$2,name_color=$3,show_level_badge=$4,show_level_color=$5,avatar=$6,title=$7,location=$8 WHERE id=$9',
     [bio??req.user.bio, newLinks, name_color??req.user.name_color,
      show_level_badge!==undefined?(show_level_badge?1:0):req.user.show_level_badge,
      show_level_color!==undefined?(show_level_color?1:0):req.user.show_level_color,
-     newAvatar, req.user.id]);
+     newAvatar, title??req.user.title??'', location??req.user.location??'', req.user.id]);
   const { rows } = await query('SELECT * FROM users WHERE id=$1', [req.user.id]);
   res.json(sanitizeUser(rows[0]));
 });
@@ -1591,7 +1601,8 @@ app.get('/api/conversation/:username', authMiddleware, async (req, res) => {
     SELECT m.*, 
       u.username as sender_username, u.avatar as sender_avatar, u.name_color as sender_name_color,
       f.title as forum_title, f.slug as forum_slug, f.banner_image as forum_banner,
-      r.content as reply_content, ru.username as reply_username
+      r.content as reply_content, ru.username as reply_username,
+      m.read_at
     FROM dm_messages m
     JOIN users u ON m.sender_id=u.id
     LEFT JOIN forums f ON m.shared_forum_id=f.id
@@ -1616,8 +1627,22 @@ app.get('/api/conversation/:username', authMiddleware, async (req, res) => {
   res.json({ conv, other, messages: msgs, isHidden, hasPassword: !!hiddenPass });
 });
 
-app.post('/api/conversation/:username/messages', authMiddleware, upload.single('image'), async (req, res) => {
+// Mesajları okundu işaretle
+app.post('/api/conversation/:username/mark-read', authMiddleware, async (req, res) => {
   const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const other = target[0];
+  const uid = req.user.id;
+  const u1 = Math.min(uid, other.id), u2 = Math.max(uid, other.id);
+  const { rows: convRows } = await query('SELECT id FROM dm_conversations WHERE user1_id=$1 AND user2_id=$2', [u1, u2]);
+  if (!convRows.length) return res.json({ ok: true });
+  // Karşı tarafın mesajlarını okundu yap
+  await query('UPDATE dm_messages SET read_at=NOW() WHERE conversation_id=$1 AND sender_id=$2 AND read_at IS NULL',
+    [convRows[0].id, other.id]);
+  res.json({ ok: true });
+});
+
+app.post('/api/conversation/:username/messages', authMiddleware, upload.single('image'), async (req, res) => {  const { rows: target } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
   if (!target.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
   const other = target[0];
   const uid = req.user.id;

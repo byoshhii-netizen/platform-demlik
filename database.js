@@ -310,6 +310,9 @@ async function initDb() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS spotify_refresh TEXT DEFAULT '';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS spotify_show INTEGER DEFAULT 1;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS spotify_expires BIGINT DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS title TEXT DEFAULT '';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
+    ALTER TABLE dm_messages ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;
   `);
 
   // Seed default levels
