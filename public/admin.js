@@ -117,7 +117,8 @@ function loadSection(section) {
     forums: renderForums, books: renderBooks, groups: renderGroups,
     levels: renderLevels, tags: renderTags, logs: renderLogs,
     settings: renderSettings, messages: renderAdminMessages,
-    announcements: renderAnnouncements
+    announcements: renderAnnouncements,
+    songs: renderAdminSongs, 'artist-apps': renderArtistApps
   };
   if (map[section]) map[section](main);
 }
@@ -500,255 +501,224 @@ function showAnnModal(ann, anns) {
   });
 }
 
-// ===== FORUMS =====
-async function renderForums(main) {
-  let forums = [];
-  try { forums = await adminApi('/forums'); } catch (e) { main.innerHTML = `<p style="color:var(--red2);padding:20px">${e.message}</p>`; return; }
+// ===== ADMIN: MÜZİKLER =====
+async function renderAdminSongs(main) {
+  let songs = [];
+  try { songs = await adminApi('/songs'); } catch (e) { main.innerHTML = `<p style="color:var(--red2);padding:20px">${e.message}</p>`; return; }
   main.innerHTML = `
     <div class="adm-section-header">
-      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-comments"></i></div> Konular <span style="font-size:13px;font-weight:400;color:var(--text2)">(${forums.length})</span></div>
-      <div class="adm-search"><i class="fas fa-search"></i><input type="text" id="forum-search" placeholder="Konu ara..." /></div>
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-music"></i></div> Müzikler <span style="font-size:13px;font-weight:400;color:var(--text2)">(${songs.length})</span></div>
+      <div class="adm-search"><i class="fas fa-search"></i><input type="text" id="song-search" placeholder="Şarkı, sanatçı, dağıtıcı ara..." style="min-width:220px" /></div>
     </div>
-    <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>ID</th><th>Başlık</th><th>Yazar</th><th>Görüntülenme</th><th>Tarih</th><th>İşlem</th></tr></thead>
-      <tbody id="forums-tbody"></tbody>
-    </table></div></div>`;
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Kapak</th><th>Başlık / Sanatçı</th><th>Tür</th><th>Dağıtıcı</th><th>Dinlenme</th><th>Durum</th><th>Yükleyen</th><th>Tarih</th><th>İşlem</th></tr></thead>
+          <tbody id="songs-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
   const render = (list) => {
-    const t = $('#forums-tbody'); if (!t) return;
-    t.innerHTML = list.map(f => `<tr>
-      <td style="color:var(--text3);font-size:11px">#${f.id}</td>
-      <td><a href="/forum/${escHtml(f.slug)}" target="_blank" style="color:var(--red2)">${escHtml((f.title||'').substring(0,60))}${(f.title||'').length>60?'...':''}</a></td>
-      <td style="font-size:12px">${escHtml(f.username||'Silindi')}</td>
-      <td style="font-size:12px">${f.views||0}</td>
-      <td style="font-size:11px;color:var(--text3)">${timeAgo(f.created_at)}</td>
-      <td><div style="display:flex;gap:4px">
-        <button class="btn btn-outline btn-xs ef-btn" data-id="${f.id}"><i class="fas fa-edit"></i></button>
-        <button class="btn btn-danger btn-xs df-btn" data-id="${f.id}"><i class="fas fa-trash"></i></button>
-      </div></td>
+    const t = document.getElementById('songs-tbody'); if (!t) return;
+    if (!list.length) { t.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:32px">Şarkı yok</td></tr>'; return; }
+    t.innerHTML = list.map(s => `<tr>
+      <td>${s.cover_url ? `<img src="${escHtml(s.cover_url)}" style="width:40px;height:40px;border-radius:6px;object-fit:cover" />` : `<div style="width:40px;height:40px;border-radius:6px;background:var(--bg4);display:flex;align-items:center;justify-content:center;color:var(--text3)"><i class="fas fa-music"></i></div>`}</td>
+      <td>
+        <div style="font-weight:600;font-size:13px">${escHtml(s.title)}</div>
+        <div style="font-size:11px;color:var(--text2)">${escHtml(s.artist_name)}</div>
+      </td>
+      <td style="font-size:12px;color:var(--text2)">${escHtml(s.genre||'-')}</td>
+      <td style="font-size:12px;color:var(--text2)">${escHtml(s.distributor||'-')}</td>
+      <td style="font-size:12px">${s.play_count}</td>
+      <td>${s.status === 'active' ? '<span class="badge badge-green">Aktif</span>' : s.status === 'suspended' ? '<span class="badge badge-red">Askıda</span>' : `<span class="badge badge-gray">${escHtml(s.status)}</span>`}</td>
+      <td style="font-size:11px;color:var(--text2)">${escHtml(s.uploader||'-')}</td>
+      <td style="font-size:11px;color:var(--text3)">${timeAgo(s.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-xs es-btn" data-id="${s.id}" title="Düzenle"><i class="fas fa-edit"></i></button>
+          ${s.status === 'active'
+            ? `<button class="btn btn-danger btn-xs sus-btn" data-id="${s.id}" title="Askıya Al"><i class="fas fa-pause"></i></button>`
+            : `<button class="btn btn-green btn-xs unsus-btn" data-id="${s.id}" title="Aktife Al"><i class="fas fa-play"></i></button>`}
+          <button class="btn btn-danger btn-xs ds-btn" data-id="${s.id}" title="Sil"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
     </tr>`).join('');
+
     t.addEventListener('click', async e => {
-      const ef = e.target.closest('.ef-btn'), df = e.target.closest('.df-btn');
-      if (ef) { const f = forums.find(x=>x.id==ef.dataset.id); if(f) showForumEditModal(f); }
-      if (df) { if (!confirm('Konu silinsin mi?')) return; try{await adminApi('/forum/'+df.dataset.id,{method:'DELETE'}); toast('Silindi'); loadSection('forums');}catch(e){toast(e.message,'error');} }
+      const es = e.target.closest('.es-btn');
+      const sus = e.target.closest('.sus-btn');
+      const unsus = e.target.closest('.unsus-btn');
+      const ds = e.target.closest('.ds-btn');
+      if (es) { const s = list.find(x => x.id == es.dataset.id); if (s) showSongEditModal(s); }
+      if (sus) {
+        if (!confirm('Şarkı askıya alınsın mı?')) return;
+        try { await adminApi('/songs/'+sus.dataset.id, {method:'PUT', body:JSON.stringify({status:'suspended'})}); toast('Askıya alındı'); loadSection('songs'); } catch(e){toast(e.message,'error');}
+      }
+      if (unsus) {
+        try { await adminApi('/songs/'+unsus.dataset.id, {method:'PUT', body:JSON.stringify({status:'active'})}); toast('Aktife alındı'); loadSection('songs'); } catch(e){toast(e.message,'error');}
+      }
+      if (ds) { if (!confirm('Şarkı kalıcı silinsin mi?')) return; try { await adminApi('/songs/'+ds.dataset.id, {method:'DELETE'}); toast('Silindi'); loadSection('songs'); } catch(e){toast(e.message,'error');} }
     });
   };
-  render(forums);
-  $('#forum-search').addEventListener('input', e => { const q=e.target.value.toLowerCase(); render(forums.filter(f=>f.title.toLowerCase().includes(q)||(f.username||'').toLowerCase().includes(q))); });
-}
-
-function showForumEditModal(forum) {
-  showModal('Konu Düzenle', `
-    <div class="form-group"><label>Başlık</label><input id="ef-title" value="${escHtml(forum.title)}" /></div>
-    <div class="form-group"><label>İçerik</label><textarea id="ef-content" rows="8">${escHtml(forum.content)}</textarea></div>
-    <label class="checkbox-label" style="margin-bottom:12px"><input type="checkbox" id="ef-comments" ${forum.allow_comments?'checked':''} /> Yorumlara izin ver</label>
-    <button class="btn btn-primary" id="ef-submit" style="width:100%;justify-content:center">Kaydet</button>
-    <div id="ef-error" class="form-error mt-4"></div>
-  `);
-  $('#ef-submit').addEventListener('click', async () => {
-    try { await adminApi('/forum/'+forum.id,{method:'PUT',body:JSON.stringify({title:$('#ef-title').value.trim(),content:$('#ef-content').value.trim(),allow_comments:$('#ef-comments').checked})}); toast('Güncellendi'); hideModal(); loadSection('forums'); }
-    catch(e) { $('#ef-error').textContent=e.message; }
+  render(songs);
+  document.getElementById('song-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    render(songs.filter(s => s.title.toLowerCase().includes(q) || s.artist_name.toLowerCase().includes(q) || (s.distributor||'').toLowerCase().includes(q)));
   });
 }
 
-// ===== BOOKS =====
-async function renderBooks(main) {
-  let books = [];
-  try { books = await adminApi('/books'); } catch {}
-  main.innerHTML = `
-    <div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-book"></i></div> Kitaplar <span style="font-size:13px;font-weight:400;color:var(--text2)">(${books.length})</span></div></div>
-    <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>ID</th><th>Başlık</th><th>Yazar</th><th>Sayfa</th><th>Tarih</th><th>İşlem</th></tr></thead>
-      <tbody>${books.map(b=>`<tr>
-        <td style="color:var(--text3);font-size:11px">#${b.id}</td>
-        <td><a href="/kitap/${escHtml(b.slug)}" target="_blank" style="color:var(--red2)">${escHtml((b.title||'').substring(0,50))}</a></td>
-        <td style="font-size:12px">${escHtml(b.username||'Silindi')}</td>
-        <td>${b.page_count}</td>
-        <td style="font-size:11px;color:var(--text3)">${timeAgo(b.created_at)}</td>
-        <td><button class="btn btn-danger btn-xs db-btn" data-id="${b.id}"><i class="fas fa-trash"></i></button></td>
-      </tr>`).join('')}</tbody>
-    </table></div></div>`;
-  $('#admin-main').addEventListener('click', async e => {
-    const db = e.target.closest('.db-btn');
-    if (db) { if(!confirm('Kitap silinsin mi?')) return; try{await adminApi('/book/'+db.dataset.id,{method:'DELETE'}); toast('Silindi'); loadSection('books');}catch(e){toast(e.message,'error');} }
-  });
-}
-
-// ===== GROUPS =====
-async function renderGroups(main) {
-  let groups = [];
-  try { groups = await adminApi('/groups'); } catch {}
-  main.innerHTML = `
-    <div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-users-cog"></i></div> Gruplar</div></div>
-    <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>ID</th><th>İsim</th><th>Tür</th><th>Sahip</th><th>Üye</th><th>Tarih</th><th>İşlem</th></tr></thead>
-      <tbody>${groups.map(g=>`<tr>
-        <td style="color:var(--text3);font-size:11px">#${g.id}</td>
-        <td><a href="/grup/${escHtml(g.slug)}" target="_blank" style="color:var(--red2)">${escHtml(g.name)}</a></td>
-        <td>${g.type==='private'?'<span class="badge badge-red">Özel</span>':'<span class="badge badge-green">Açık</span>'}</td>
-        <td style="font-size:12px">${escHtml(g.owner_name||'Silindi')}</td>
-        <td>${g.member_count}</td>
-        <td style="font-size:11px;color:var(--text3)">${timeAgo(g.created_at)}</td>
-        <td><button class="btn btn-danger btn-xs dg-btn" data-id="${g.id}"><i class="fas fa-trash"></i></button></td>
-      </tr>`).join('')}</tbody>
-    </table></div></div>`;
-  $('#admin-main').addEventListener('click', async e => {
-    const dg = e.target.closest('.dg-btn');
-    if (dg) { if(!confirm('Grup silinsin mi?')) return; try{await adminApi('/group/'+dg.dataset.id,{method:'DELETE'}); toast('Silindi'); loadSection('groups');}catch(e){toast(e.message,'error');} }
-  });
-}
-
-// ===== LEVELS =====
-async function renderLevels(main) {
-  let levels = [];
-  try { levels = await adminApi('/levels'); } catch {}
-  main.innerHTML = `
-    <div class="adm-section-header">
-      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-layer-group"></i></div> Seviyeler</div>
-      <button class="btn btn-primary btn-sm" id="add-level-btn"><i class="fas fa-plus"></i> Ekle</button>
-    </div>
-    <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>ID</th><th>İkon</th><th>İsim</th><th>Renk</th><th>Min Konu</th><th>Min Kitap</th><th>Min Yorum</th><th>Sıra</th><th>İşlem</th></tr></thead>
-      <tbody id="levels-tbody"></tbody>
-    </table></div></div>`;
-  renderLevelsTable(levels);
-  $('#add-level-btn').addEventListener('click', () => showLevelModal(null, () => loadSection('levels')));
-}
-
-function renderLevelsTable(levels) {
-  const t = $('#levels-tbody'); if (!t) return;
-  t.innerHTML = levels.map(l => `<tr>
-    <td style="color:var(--text3);font-size:11px">#${l.id}</td>
-    <td><i class="${escHtml(l.icon)}" style="color:${escHtml(l.color)};font-size:18px"></i></td>
-    <td><strong style="color:${escHtml(l.color)}">${escHtml(l.name)}</strong></td>
-    <td><div style="width:20px;height:20px;border-radius:50%;background:${escHtml(l.color)};display:inline-block;vertical-align:middle"></div> <span style="font-size:11px;color:var(--text2)">${escHtml(l.color)}</span></td>
-    <td>${l.min_forums>=9999999?'∞':l.min_forums}</td>
-    <td>${l.min_books>=9999999?'∞':l.min_books}</td>
-    <td>${l.min_comments>=9999999?'∞':l.min_comments}</td>
-    <td>${l.order_num}</td>
-    <td><div style="display:flex;gap:4px">
-      <button class="btn btn-outline btn-xs el-btn" data-id="${l.id}"><i class="fas fa-edit"></i></button>
-      <button class="btn btn-danger btn-xs dl-btn" data-id="${l.id}"><i class="fas fa-trash"></i></button>
-    </div></td>
-  </tr>`).join('');
-  t.addEventListener('click', async e => {
-    const el=e.target.closest('.el-btn'), dl=e.target.closest('.dl-btn');
-    if (el) { const lv=levels.find(x=>x.id==el.dataset.id); if(lv) showLevelModal(lv, ()=>loadSection('levels')); }
-    if (dl) { if(!confirm('Seviye silinsin mi?')) return; try{await adminApi('/level/'+dl.dataset.id,{method:'DELETE'}); toast('Silindi'); loadSection('levels');}catch(e){toast(e.message,'error');} }
-  });
-}
-
-function showLevelModal(level, cb) {
-  showModal(level?'Seviye Düzenle':'Yeni Seviye', `
+function showSongEditModal(song) {
+  showModal(`Şarkı Düzenle — ${escHtml(song.title)}`, `
     <div class="form-row">
-      <div class="form-group"><label>İsim</label><input id="lv-name" value="${escHtml(level?.name||'')}" /></div>
-      <div class="form-group"><label>İkon (FontAwesome)</label><input id="lv-icon" value="${escHtml(level?.icon||'fas fa-star')}" /></div>
+      <div class="form-group"><label>Şarkı Adı</label><input id="se-title" value="${escHtml(song.title)}" /></div>
+      <div class="form-group"><label>Sanatçı Adı</label><input id="se-artist" value="${escHtml(song.artist_name)}" /></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Renk</label><input id="lv-color" type="color" value="${level?.color||'#dc2626'}" style="height:38px;cursor:pointer" /></div>
-      <div class="form-group"><label>Sıra</label><input id="lv-order" type="number" value="${level?.order_num||0}" /></div>
+      <div class="form-group"><label>Dağıtıcı</label><input id="se-dist" value="${escHtml(song.distributor||'')}" /></div>
+      <div class="form-group"><label>Tür</label><input id="se-genre" value="${escHtml(song.genre||'')}" /></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Min Konu</label><input id="lv-forums" type="number" value="${level?.min_forums||0}" /></div>
-      <div class="form-group"><label>Min Kitap</label><input id="lv-books" type="number" value="${level?.min_books||0}" /></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Min Yorum</label><input id="lv-comments" type="number" value="${level?.min_comments||0}" /></div>
-      <div class="form-group"><label>Herhangi Biri (OR)</label>
-        <select id="lv-reqany"><option value="0" ${!level?.require_any?'selected':''}>Hepsini Gerektir</option><option value="1" ${level?.require_any?'selected':''}>Herhangi Biri Yeterli</option></select>
+      <div class="form-group"><label>Dinlenme Sayısı</label><input id="se-plays" type="number" value="${song.play_count}" /></div>
+      <div class="form-group"><label>Durum</label>
+        <select id="se-status">
+          <option value="active" ${song.status==='active'?'selected':''}>Aktif</option>
+          <option value="suspended" ${song.status==='suspended'?'selected':''}>Askıda</option>
+          <option value="deleted" ${song.status==='deleted'?'selected':''}>Silindi</option>
+        </select>
       </div>
     </div>
-    <button class="btn btn-primary" id="lv-save" style="width:100%;justify-content:center">${level?'Güncelle':'Oluştur'}</button>
-    <div id="lv-error" class="form-error mt-4"></div>
+    <div class="form-group"><label>Şarkı Sözleri</label><textarea id="se-lyrics" rows="6">${escHtml(song.lyrics||'')}</textarea></div>
+    <div class="form-group"><label>Yeni Ses Dosyası (boş bırak = değişme)</label>
+      <input type="file" id="se-audio" accept="audio/*" style="background:var(--bg3);border:1px dashed var(--border);padding:8px;cursor:pointer;border-radius:8px" />
+    </div>
+    <div class="form-group"><label>Yeni Kapak Fotoğrafı (boş bırak = değişme)</label>
+      <input type="file" id="se-cover" accept="image/*" style="background:var(--bg3);border:1px dashed var(--border);padding:8px;cursor:pointer;border-radius:8px" />
+    </div>
+    <button class="btn btn-primary" id="se-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
+    <div id="se-msg" class="form-error mt-4"></div>
   `);
-  $('#lv-save').addEventListener('click', async () => {
-    const body = { name:$('#lv-name').value.trim(), icon:$('#lv-icon').value.trim(),
-      color:$('#lv-color').value, order_num:parseInt($('#lv-order').value)||0,
-      min_forums:parseInt($('#lv-forums').value)||0, min_books:parseInt($('#lv-books').value)||0,
-      min_comments:parseInt($('#lv-comments').value)||0, require_any:parseInt($('#lv-reqany').value)||0 };
+  document.getElementById('se-save').addEventListener('click', async () => {
+    const btn = document.getElementById('se-save');
+    btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> Kaydediliyor...';
+    const fd = new FormData();
+    fd.append('title', document.getElementById('se-title').value.trim());
+    fd.append('artist_name', document.getElementById('se-artist').value.trim());
+    fd.append('distributor', document.getElementById('se-dist').value.trim());
+    fd.append('genre', document.getElementById('se-genre').value.trim());
+    fd.append('lyrics', document.getElementById('se-lyrics').value.trim());
+    fd.append('play_count', document.getElementById('se-plays').value);
+    fd.append('status', document.getElementById('se-status').value);
+    const af = document.getElementById('se-audio').files[0]; if(af) fd.append('audio', af);
+    const cf = document.getElementById('se-cover').files[0]; if(cf) fd.append('cover', cf);
     try {
-      if (level) await adminApi('/level/'+level.id, {method:'PUT', body:JSON.stringify(body)});
-      else await adminApi('/levels', {method:'POST', body:JSON.stringify(body)});
-      toast(level?'Güncellendi':'Oluşturuldu'); hideModal(); cb();
-    } catch(e) { $('#lv-error').textContent=e.message; }
+      const res = await fetch('/api/admin/songs/'+song.id, { method:'PUT', headers:{'X-Admin-Token':adminToken}, body:fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error||'Hata');
+      toast('Şarkı güncellendi'); hideModal(); loadSection('songs');
+    } catch(e) { document.getElementById('se-msg').textContent=e.message; btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Kaydet'; }
   });
 }
 
-// ===== TAGS =====
-async function renderTags(main) {
-  let tags = [];
-  try { tags = await adminApi('/tags'); } catch {}
+// ===== ADMIN: ARTİST BAŞVURULARI =====
+async function renderArtistApps(main) {
+  let apps = [];
+  try { apps = await adminApi('/artist-applications'); } catch (e) { main.innerHTML = `<p style="color:var(--red2);padding:20px">${e.message}</p>`; return; }
+  const pending = apps.filter(a => a.status === 'pending');
+  const others = apps.filter(a => a.status !== 'pending');
   main.innerHTML = `
     <div class="adm-section-header">
-      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-tags"></i></div> Etiketler</div>
-      <button class="btn btn-primary btn-sm" id="add-tag-btn"><i class="fas fa-plus"></i> Ekle</button>
+      <div class="adm-section-title">
+        <div class="icon-pill"><i class="fas fa-microphone"></i></div>
+        Artist Başvuruları
+        ${pending.length ? `<span class="adm-nav-badge">${pending.length}</span>` : ''}
+      </div>
     </div>
-    <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>ID</th><th>İsim</th><th>Renk</th><th>Tür</th><th>İşlem</th></tr></thead>
-      <tbody>${tags.map(t=>`<tr>
-        <td style="color:var(--text3);font-size:11px">#${t.id}</td>
-        <td><span class="badge" style="background:${escHtml(t.color)}22;color:${escHtml(t.color)};border:1px solid ${escHtml(t.color)}44">${escHtml(t.name)}</span></td>
-        <td><div style="width:20px;height:20px;border-radius:50%;background:${escHtml(t.color)};display:inline-block"></div></td>
-        <td>${t.is_system?'<span class="badge badge-blue">Sistem</span>':'<span class="badge badge-gray">Özel</span>'}</td>
-        <td><div style="display:flex;gap:4px">
-          <button class="btn btn-outline btn-xs et-btn" data-id="${t.id}"><i class="fas fa-edit"></i></button>
-          <button class="btn btn-danger btn-xs dt-btn" data-id="${t.id}"><i class="fas fa-trash"></i></button>
-        </div></td>
-      </tr>`).join('')}</tbody>
-    </table></div></div>`;
-  $('#add-tag-btn').addEventListener('click', () => showTagModal(null, () => loadSection('tags')));
-  $('#admin-main').addEventListener('click', async e => {
-    const et=e.target.closest('.et-btn'), dt=e.target.closest('.dt-btn');
-    if (et) { const tag=tags.find(x=>x.id==et.dataset.id); if(tag) showTagModal(tag, ()=>loadSection('tags')); }
-    if (dt) { if(!confirm('Etiket silinsin mi?')) return; try{await adminApi('/tag/'+dt.dataset.id,{method:'DELETE'}); toast('Silindi'); loadSection('tags');}catch(e){toast(e.message,'error');} }
-  });
-}
+    ${pending.length ? `
+    <div style="margin-bottom:24px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⏳ Bekleyen (${pending.length})</div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Kullanıcı</th><th>Tür</th><th>Örnek</th><th>Not</th><th>Tarih</th><th>İşlem</th></tr></thead>
+            <tbody id="pending-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>` : '<div class="card" style="margin-bottom:20px"><div class="card-body" style="text-align:center;color:var(--text3);padding:30px"><i class="fas fa-check-circle" style="font-size:28px;margin-bottom:8px;color:var(--green)"></i><div>Bekleyen başvuru yok</div></div></div>'}
+    ${others.length ? `
+    <div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Geçmiş Başvurular</div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Kullanıcı</th><th>Tür</th><th>Durum</th><th>İnceleme</th><th>Tarih</th></tr></thead>
+            <tbody>${others.map(a => `<tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px">
+                  ${a.avatar ? `<img src="${escHtml(a.avatar)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover" />` : `<div style="width:28px;height:28px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center"><i class="fas fa-user" style="font-size:11px"></i></div>`}
+                  <strong>${escHtml(a.username)}</strong>
+                </div>
+              </td>
+              <td style="font-size:12px">${escHtml(a.genre)}</td>
+              <td>${a.status === 'accepted' ? '<span class="badge badge-green"><i class="fas fa-check"></i> Onaylandı</span>' : '<span class="badge badge-red"><i class="fas fa-times"></i> Reddedildi</span>'}</td>
+              <td style="font-size:11px;color:var(--text3)">${a.reviewed_at ? timeAgo(a.reviewed_at) : '-'}</td>
+              <td style="font-size:11px;color:var(--text3)">${timeAgo(a.created_at)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>` : ''}`;
 
-function showTagModal(tag, cb) {
-  showModal(tag?'Etiket Düzenle':'Yeni Etiket', `
-    <div class="form-row">
-      <div class="form-group"><label>İsim</label><input id="tg-name" value="${escHtml(tag?.name||'')}" /></div>
-      <div class="form-group"><label>Renk</label><input id="tg-color" type="color" value="${tag?.color||'#dc2626'}" style="height:38px;cursor:pointer" /></div>
-    </div>
-    <button class="btn btn-primary" id="tg-save" style="width:100%;justify-content:center">${tag?'Güncelle':'Oluştur'}</button>
-    <div id="tg-error" class="form-error mt-4"></div>
-  `);
-  $('#tg-save').addEventListener('click', async () => {
-    const body = {name:$('#tg-name').value.trim(), color:$('#tg-color').value};
-    try {
-      if (tag) await adminApi('/tag/'+tag.id, {method:'PUT', body:JSON.stringify(body)});
-      else await adminApi('/tags', {method:'POST', body:JSON.stringify(body)});
-      toast(tag?'Güncellendi':'Oluşturuldu'); hideModal(); cb();
-    } catch(e) { $('#tg-error').textContent=e.message; }
-  });
-}
+  const pt = document.getElementById('pending-tbody');
+  if (pt && pending.length) {
+    pt.innerHTML = pending.map(a => `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${a.avatar ? `<img src="${escHtml(a.avatar)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" />` : `<div style="width:32px;height:32px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center"><i class="fas fa-user" style="font-size:12px"></i></div>`}
+          <div>
+            <div style="font-weight:600;font-size:13px">${escHtml(a.username)}</div>
+            <div style="font-size:10px;color:var(--text3)">#${a.user_id}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px">${escHtml(a.genre)}</td>
+      <td>
+        ${a.sample_song_url ? `<a href="${escHtml(a.sample_song_url)}" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-external-link-alt"></i> URL</a>` : ''}
+        ${a.sample_song_file ? `<a href="${escHtml(a.sample_song_file)}" target="_blank" class="btn btn-outline btn-xs"><i class="fas fa-music"></i> Dosya</a>` : ''}
+      </td>
+      <td style="font-size:12px;color:var(--text2);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(a.note||'-')}</td>
+      <td style="font-size:11px;color:var(--text3)">${timeAgo(a.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-green btn-sm approve-app-btn" data-id="${a.id}" data-uid="${a.user_id}">
+            <i class="fas fa-check"></i> Onayla
+          </button>
+          <button class="btn btn-danger btn-sm reject-app-btn" data-id="${a.id}">
+            <i class="fas fa-times"></i> Reddet
+          </button>
+        </div>
+      </td>
+    </tr>`).join('');
 
-// ===== LOGS =====
-async function renderLogs(main) {
-  let logs = [];
-  try { logs = await adminApi('/logs?limit=200'); } catch {}
-  main.innerHTML = `
-    <div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-history"></i></div> Sistem Logları</div></div>
-    <div class="card"><div class="table-wrap"><table>
-      <thead><tr><th>Aktör</th><th>İşlem</th><th>Hedef</th><th>Detay</th><th>IP</th><th>Zaman</th></tr></thead>
-      <tbody>${logs.map(l=>`<tr>
-        <td style="font-weight:600;color:var(--red2)">${escHtml(l.actor)}</td>
-        <td><span class="badge badge-gray">${escHtml(l.action)}</span></td>
-        <td style="font-size:12px;color:var(--text2)">${escHtml(l.target||'-')}</td>
-        <td style="font-size:11px;color:var(--text3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(l.detail||'-')}</td>
-        <td style="font-size:11px;color:var(--text3)">${escHtml(l.ip||'-')}</td>
-        <td style="font-size:11px;color:var(--text3)">${timeAgo(l.created_at)}</td>
-      </tr>`).join('')}</tbody>
-    </table></div></div>`;
-}
-
-// ===== MESSAGES =====
-async function renderAdminMessages(main) {
-  main.innerHTML = `
-    <div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-envelope"></i></div> Mesajlar</div></div>
-    <div class="card"><div class="card-body" style="color:var(--text2);text-align:center;padding:40px">
-      <i class="fas fa-lock" style="font-size:32px;margin-bottom:12px;color:var(--text3)"></i>
-      <div>Kullanıcı mesajları gizlilik nedeniyle admin panelinde görüntülenemez.</div>
-    </div></div>`;
+    pt.addEventListener('click', async e => {
+      const approve = e.target.closest('.approve-app-btn');
+      const reject = e.target.closest('.reject-app-btn');
+      if (approve) {
+        if (!confirm('Başvuru onaylansın mı? Kullanıcıya artist rozeti verilecek.')) return;
+        try {
+          await adminApi('/artist-applications/'+approve.dataset.id+'/review', { method:'POST', body:JSON.stringify({status:'accepted'}) });
+          toast('✓ Artist rozeti verildi!'); loadSection('artist-apps');
+        } catch(e) { toast(e.message, 'error'); }
+      }
+      if (reject) {
+        if (!confirm('Başvuru reddedilsin mi?')) return;
+        try {
+          await adminApi('/artist-applications/'+reject.dataset.id+'/review', { method:'POST', body:JSON.stringify({status:'rejected'}) });
+          toast('Başvuru reddedildi'); loadSection('artist-apps');
+        } catch(e) { toast(e.message, 'error'); }
+      }
+    });
+  }
 }
 
 // ===== SETTINGS =====
@@ -763,7 +733,6 @@ async function renderSettings(main) {
         <div class="card-header"><span><i class="fas fa-palette" style="color:var(--red2);margin-right:8px"></i>Genel</span></div>
         <div class="card-body">
           <div class="form-group"><label>Site Adı</label><input id="s-sitename" value="${escHtml(settings['site_name']||'Demlik')}" /></div>
-
           <div class="form-group">
             <label>Site Logosu</label>
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
@@ -771,7 +740,7 @@ async function renderSettings(main) {
                 ${settings['site_logo'] ? `<img src="${escHtml(settings['site_logo'])}" style="width:100%;height:100%;object-fit:contain" />` : `<i class="fas fa-image" style="color:var(--text3)"></i>`}
               </div>
               <div style="flex:1">
-                <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Cihazınızdan PNG, JPG veya SVG yükleyin</div>
+                <div style="font-size:12px;color:var(--text2);margin-bottom:6px">PNG, JPG veya SVG yükleyin</div>
                 <label for="logo-file-input" class="btn btn-outline btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
                   <i class="fas fa-upload"></i> Dosya Seç
                 </label>
@@ -782,7 +751,6 @@ async function renderSettings(main) {
             <button class="btn btn-primary btn-sm" id="logo-upload-btn" style="display:none"><i class="fas fa-check"></i> Logoyu Kaydet</button>
             <div id="logo-msg" class="form-error mt-4"></div>
           </div>
-
           <div class="form-group"><label>Site Açıklaması</label><textarea id="s-desc" rows="3">${escHtml(settings['site_description']||'')}</textarea></div>
           <button class="btn btn-primary" id="s-general-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
           <div id="s-general-msg" class="form-error mt-4"></div>
@@ -812,172 +780,83 @@ async function renderSettings(main) {
       <div class="card">
         <div class="card-header"><span><i class="fas fa-shield-halved" style="color:var(--red2);margin-right:8px"></i>KVKK Metni</span></div>
         <div class="card-body">
-          <div class="form-group"><textarea id="s-kvkk" rows="6">${escHtml(settings['kvkk_text']||'')}</textarea></div>
+          <div class="form-group"><textarea id="s-kvkk" rows="5">${escHtml(settings['kvkk_text']||'')}</textarea></div>
           <button class="btn btn-primary" id="s-kvkk-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
           <div id="s-kvkk-msg" class="form-error mt-4"></div>
         </div>
       </div>
+      <div class="card">
+        <div class="card-header"><span><i class="fas fa-music" style="color:var(--red2);margin-right:8px"></i>Şarkı Yayınlama Kuralları</span></div>
+        <div class="card-body">
+          <div class="form-group"><label>Kendi Şarkım – Kurallar</label><textarea id="s-music-own" rows="4">${escHtml(settings['music_own_rules']||'')}</textarea></div>
+          <button class="btn btn-primary btn-sm" id="s-music-own-save" style="width:100%;justify-content:center;margin-bottom:16px"><i class="fas fa-save"></i> Kaydet</button>
+          <div class="form-group"><label>Başkasının Şarkısı – Kurallar</label><textarea id="s-music-other" rows="4">${escHtml(settings['music_other_rules']||'')}</textarea></div>
+          <button class="btn btn-primary btn-sm" id="s-music-other-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
+          <div id="s-music-msg" class="form-error mt-4"></div>
+        </div>
+      </div>
     </div>`;
 
-  // Logo dosya seçici
+  // Logo upload
   const logoInput = document.getElementById('logo-file-input');
   logoInput.addEventListener('change', () => {
-    const file = logoInput.files[0];
-    if (!file) return;
+    const file = logoInput.files[0]; if (!file) return;
     document.getElementById('logo-filename').textContent = file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
     document.getElementById('logo-upload-btn').style.display = 'inline-flex';
-    // Anlık önizleme
     const reader = new FileReader();
-    reader.onload = e => {
-      const prev = document.getElementById('logo-preview');
-      if (prev) prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:contain" />`;
-    };
+    reader.onload = e => { const p=document.getElementById('logo-preview'); if(p) p.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:contain" />`; };
     reader.readAsDataURL(file);
   });
-
   document.getElementById('logo-upload-btn').addEventListener('click', async () => {
-    const file = logoInput.files[0];
-    const msgEl = document.getElementById('logo-msg');
-    if (!file) { msgEl.textContent = 'Dosya seçin'; return; }
+    const file = logoInput.files[0]; const msgEl = document.getElementById('logo-msg');
+    if (!file) { msgEl.textContent='Dosya seçin'; return; }
     const btn = document.getElementById('logo-upload-btn');
-    btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> Yükleniyor...';
-    msgEl.textContent = '';
+    btn.disabled=true; btn.innerHTML='<div class="spinner" style="width:14px;height:14px"></div> Yükleniyor...';
+    msgEl.textContent='';
     try {
-      const formData = new FormData();
-      formData.append('logo', file);
-      const res = await fetch('/api/admin/upload-logo', {
-        method: 'POST',
-        headers: { 'X-Admin-Token': adminToken },
-        body: formData
-      });
+      const fd = new FormData(); fd.append('logo', file);
+      const res = await fetch('/api/admin/upload-logo', { method:'POST', headers:{'X-Admin-Token':adminToken}, body:fd });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Hata');
-      toast('Logo güncellendi! Sayfayı yenileyin.');
-      msgEl.style.color = 'var(--green)';
-      msgEl.textContent = '✓ Logo başarıyla kaydedildi';
-    } catch (e) {
-      msgEl.style.color = 'var(--red2)';
-      msgEl.textContent = e.message;
-    } finally {
-      btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Logoyu Kaydet';
-    }
+      if (!res.ok) throw new Error(data.error||'Hata');
+      toast('Logo güncellendi!'); msgEl.style.color='var(--green)'; msgEl.textContent='✓ Kaydedildi';
+    } catch(e) { msgEl.style.color='var(--red2)'; msgEl.textContent=e.message; }
+    finally { btn.disabled=false; btn.innerHTML='<i class="fas fa-check"></i> Logoyu Kaydet'; }
   });
 
   async function saveSetting(key, value, msgEl) {
     try {
       await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Token':adminToken}, body:JSON.stringify({key,value}) });
       toast('Kaydedildi');
-    } catch(e) { if(msgEl) msgEl.textContent = e.message; }
+    } catch(e) { if(msgEl) msgEl.textContent=e.message; }
   }
 
-  $('#s-general-save').addEventListener('click', async () => {
-    const msg = $('#s-general-msg');
-    await saveSetting('site_name', $('#s-sitename').value.trim(), msg);
-    await saveSetting('site_description', $('#s-desc').value.trim(), msg);
+  document.getElementById('s-general-save').addEventListener('click', async () => {
+    const msg = document.getElementById('s-general-msg');
+    await saveSetting('site_name', document.getElementById('s-sitename').value.trim(), msg);
+    await saveSetting('site_description', document.getElementById('s-desc').value.trim(), msg);
   });
-
-  $('#s-pw-save').addEventListener('click', async () => {
-    const msg = $('#s-pw-msg');
-    const pw = $('#s-newpw').value, pw2 = $('#s-newpw2').value;
+  document.getElementById('s-pw-save').addEventListener('click', async () => {
+    const msg = document.getElementById('s-pw-msg');
+    const pw = document.getElementById('s-newpw').value, pw2 = document.getElementById('s-newpw2').value;
     if (!pw) { msg.textContent='Şifre boş olamaz'; return; }
     if (pw !== pw2) { msg.textContent='Şifreler eşleşmiyor'; return; }
-    const msgBuf = new TextEncoder().encode(pw);
-    const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
-    const hashHex = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    const hashHex = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw)))).map(b=>b.toString(16).padStart(2,'0')).join('');
     await saveSetting('admin_password', hashHex, msg);
     adminToken = hashHex; sessionStorage.setItem('admin_token', adminToken);
     msg.style.color='var(--green)'; msg.textContent='Şifre güncellendi';
   });
-
-  $('#s-footer-save').addEventListener('click', async () => {
-    const msg = $('#s-footer-msg');
-    await saveSetting('footer_copyright_text', $('#s-footer').value.trim(), msg);
-    await saveSetting('footer_created_visible', $('#s-footer-created').checked?'1':'0', msg);
+  document.getElementById('s-footer-save').addEventListener('click', async () => {
+    const msg = document.getElementById('s-footer-msg');
+    await saveSetting('footer_copyright_text', document.getElementById('s-footer').value.trim(), msg);
+    await saveSetting('footer_created_visible', document.getElementById('s-footer-created').checked?'1':'0', msg);
   });
-
-  $('#s-kvkk-save').addEventListener('click', async () => {
-    await saveSetting('kvkk_text', $('#s-kvkk').value.trim(), $('#s-kvkk-msg'));
+  document.getElementById('s-kvkk-save').addEventListener('click', async () => {
+    await saveSetting('kvkk_text', document.getElementById('s-kvkk').value.trim(), document.getElementById('s-kvkk-msg'));
   });
-}
-
-  main.innerHTML = `
-    <div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-cog"></i></div> Site Ayarları</div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="card">
-        <div class="card-header"><span><i class="fas fa-palette" style="color:var(--red2);margin-right:8px"></i>Genel</span></div>
-        <div class="card-body">
-          <div class="form-group"><label>Site Adı</label><input id="s-sitename" value="${escHtml(settings['site_name']||'Demlik')}" /></div>
-          <div class="form-group"><label>Logo URL (boş = mevcut)</label><input id="s-logo" value="${escHtml(settings['site_logo']||'')}" placeholder="https://..." /></div>
-          <div class="form-group"><label>Site Açıklaması</label><textarea id="s-desc" rows="3">${escHtml(settings['site_description']||'')}</textarea></div>
-          <button class="btn btn-primary" id="s-general-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
-          <div id="s-general-msg" class="form-error mt-4"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span><i class="fas fa-lock" style="color:var(--red2);margin-right:8px"></i>Güvenlik</span></div>
-        <div class="card-body">
-          <div class="form-group"><label>Yeni Admin Şifresi</label><input id="s-newpw" type="password" placeholder="Boş bırakırsan değişmez" /></div>
-          <div class="form-group"><label>Şifreyi Onayla</label><input id="s-newpw2" type="password" placeholder="••••••" /></div>
-          <button class="btn btn-primary" id="s-pw-save" style="width:100%;justify-content:center"><i class="fas fa-key"></i> Şifreyi Güncelle</button>
-          <div id="s-pw-msg" class="form-error mt-4"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span><i class="fas fa-file-alt" style="color:var(--red2);margin-right:8px"></i>Footer</span></div>
-        <div class="card-body">
-          <div class="form-group"><label>Footer Yazısı</label><input id="s-footer" value="${escHtml(settings['footer_copyright_text']||'')}" placeholder="© Copyright 2026" /></div>
-          <label class="checkbox-label" style="margin-bottom:12px">
-            <input type="checkbox" id="s-footer-created" ${settings['footer_created_visible']!=='0'?'checked':''} />
-            "Created By" yazısını göster
-          </label>
-          <button class="btn btn-primary" id="s-footer-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
-          <div id="s-footer-msg" class="form-error mt-4"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span><i class="fas fa-shield-halved" style="color:var(--red2);margin-right:8px"></i>KVKK Metni</span></div>
-        <div class="card-body">
-          <div class="form-group"><textarea id="s-kvkk" rows="6">${escHtml(settings['kvkk_text']||'')}</textarea></div>
-          <button class="btn btn-primary" id="s-kvkk-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
-          <div id="s-kvkk-msg" class="form-error mt-4"></div>
-        </div>
-      </div>
-    </div>`;
-
-  async function saveSetting(key, value, msgEl) {
-    try {
-      await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Token':adminToken}, body:JSON.stringify({key,value}) });
-      toast('Kaydedildi');
-    } catch(e) { if(msgEl) msgEl.textContent = e.message; }
-  }
-
-  $('#s-general-save').addEventListener('click', async () => {
-    const msg = $('#s-general-msg');
-    await saveSetting('site_name', $('#s-sitename').value.trim(), msg);
-    await saveSetting('site_logo', $('#s-logo').value.trim(), msg);
-    await saveSetting('site_description', $('#s-desc').value.trim(), msg);
+  document.getElementById('s-music-own-save').addEventListener('click', async () => {
+    await saveSetting('music_own_rules', document.getElementById('s-music-own').value.trim(), document.getElementById('s-music-msg'));
   });
-
-  $('#s-pw-save').addEventListener('click', async () => {
-    const msg = $('#s-pw-msg');
-    const pw = $('#s-newpw').value, pw2 = $('#s-newpw2').value;
-    if (!pw) { msg.textContent='Şifre boş olamaz'; return; }
-    if (pw !== pw2) { msg.textContent='Şifreler eşleşmiyor'; return; }
-    const msgBuf = new TextEncoder().encode(pw);
-    const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
-    const hashHex = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-    await saveSetting('admin_password', hashHex, msg);
-    adminToken = hashHex; sessionStorage.setItem('admin_token', adminToken);
-    msg.style.color='var(--green)'; msg.textContent='Şifre güncellendi';
-  });
-
-  $('#s-footer-save').addEventListener('click', async () => {
-    const msg = $('#s-footer-msg');
-    await saveSetting('footer_copyright_text', $('#s-footer').value.trim(), msg);
-    await saveSetting('footer_created_visible', $('#s-footer-created').checked?'1':'0', msg);
-  });
-
-  $('#s-kvkk-save').addEventListener('click', async () => {
-    await saveSetting('kvkk_text', $('#s-kvkk').value.trim(), $('#s-kvkk-msg'));
+  document.getElementById('s-music-other-save').addEventListener('click', async () => {
+    await saveSetting('music_other_rules', document.getElementById('s-music-other').value.trim(), document.getElementById('s-music-msg'));
   });
 }

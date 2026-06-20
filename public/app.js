@@ -149,6 +149,10 @@ function renderRoute(path) {
   if (path === '/mesajlar') return renderMessages(app, null);
   if (path.startsWith('/mesajlar/')) return renderMessages(app, segs[1]);
   if (path === '/arkadaslar') return renderFriends(app);
+  if (path === '/muzikler') return renderMusicList(app);
+  if (path.startsWith('/muzik/')) return renderMusicDetail(app, segs[1]);
+  if (path === '/artist-basvuru') return renderArtistApply(app);
+  if (path === '/artist-panel') return renderArtistPanel(app);
   renderNotFound(app);
 }
 
@@ -1068,7 +1072,7 @@ async function renderPageReader(app, bookSlug, pageSlug) {
         <!-- İçerik -->
         <div class="ebook-page-content" id="ebook-content" style="font-size:${fontSize}px">
           ${page.image_url ? `<img src="${escHtml(page.image_url)}" class="ebook-page-image" alt="" />` : ''}
-          <div style="font-size:1.3em;font-weight:700;margin-bottom:24px;color:#f0e8dc;font-family:'Georgia',serif">${escHtml(page.title)}</div>
+          <div class="book-title-heading">${escHtml(page.title)}</div>
           <div class="book-text">${escHtml(page.content.trim())}</div>
         </div>
 
@@ -2838,4 +2842,436 @@ async function renderSpotifyWidget(username, containerId) {
       </div>` : ''}
     </div>`;
   } catch {}
+}
+
+// ===== MÜZİK LİSTESİ =====
+async function renderMusicList(app) {
+  document.title = 'Müzikler – Demlik';
+  app.innerHTML = `<div class="container page">
+    <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div class="page-title" style="display:flex;align-items:center;gap:10px">
+        <i class="fas fa-music" style="color:var(--accent-red2)"></i> Müzikler
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${currentUser ? `<a href="/artist-basvuru" data-link class="btn btn-outline btn-sm"><i class="fas fa-microphone"></i> Artist Başvurusu</a>` : ''}
+        ${currentUser?.is_artist ? `<a href="/artist-panel" data-link class="btn btn-primary btn-sm"><i class="fas fa-upload"></i> Şarkı Yükle</a>` : ''}
+      </div>
+    </div>
+    <div class="music-search-bar" style="margin-bottom:20px">
+      <div class="search-bar" style="margin:0">
+        <i class="fas fa-search"></i>
+        <input type="text" id="music-search" placeholder="Şarkı adı, sanatçı, tür, dağıtıcı, şarkı sözü ara..." style="width:100%" />
+      </div>
+    </div>
+    <div id="music-list"></div>
+  </div>`;
+
+  let songs = [];
+  const loadSongs = async (q = '') => {
+    const el = document.getElementById('music-list');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+    try {
+      const url = q ? `/songs?q=${encodeURIComponent(q)}` : '/songs';
+      songs = await api(url);
+      if (!songs.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-music"></i><p>Henüz şarkı yok.</p></div>'; return; }
+      el.innerHTML = `<div class="music-table">
+        <div class="music-table-header">
+          <div style="width:40px">#</div>
+          <div style="flex:1">Başlık</div>
+          <div style="width:160px;display:none" class="col-dist">Dağıtıcı</div>
+          <div style="width:120px">Eklenme</div>
+          <div style="width:60px;text-align:right">Süre</div>
+        </div>
+        ${songs.map((s, i) => `
+          <div class="music-row" data-slug="${escHtml(s.slug)}">
+            <div class="music-num">${i+1}</div>
+            <div class="music-info">
+              <div class="music-cover-wrap">
+                ${s.cover_url ? `<img src="${escHtml(s.cover_url)}" class="music-cover" />` : `<div class="music-cover music-cover-ph"><i class="fas fa-music"></i></div>`}
+                <button class="music-play-mini" data-slug="${escHtml(s.slug)}" data-audio="${escHtml(s.audio_url)}"><i class="fas fa-play"></i></button>
+              </div>
+              <div>
+                <div class="music-title">${escHtml(s.title)}</div>
+                <div class="music-artist">${escHtml(s.artist_name)}</div>
+              </div>
+            </div>
+            <div class="music-dist col-dist">${escHtml(s.distributor||'-')}</div>
+            <div class="music-date">${timeAgo(s.published_at)}</div>
+            <div class="music-plays" style="text-align:right;font-size:12px;color:var(--text-muted)">${s.play_count}</div>
+          </div>`).join('')}
+      </div>`;
+      el.querySelectorAll('.music-row').forEach(row => {
+        row.addEventListener('click', e => {
+          if (!e.target.closest('.music-play-mini')) navigate('/muzik/' + row.dataset.slug);
+        });
+      });
+      el.querySelectorAll('.music-play-mini').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          openMiniPlayer(btn.dataset.audio, btn.dataset.slug, songs.find(s => s.slug === btn.dataset.slug));
+        });
+      });
+    } catch(err) { el.innerHTML = `<div class="empty-state"><p>${escHtml(err.message)}</p></div>`; }
+  };
+
+  loadSongs();
+  let t; document.getElementById('music-search')?.addEventListener('input', e => {
+    clearTimeout(t); t = setTimeout(() => loadSongs(e.target.value.trim()), 400);
+  });
+}
+
+// ===== MÜZİK DETAY =====
+let currentAudio = null;
+let currentSlug = null;
+
+function openMiniPlayer(audioUrl, slug, song) {
+  // Global player
+  let player = document.getElementById('global-music-player');
+  if (!player) {
+    player = document.createElement('div');
+    player.id = 'global-music-player';
+    document.body.appendChild(player);
+  }
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  // Update play buttons
+  document.querySelectorAll('.music-play-mini').forEach(b => b.innerHTML = '<i class="fas fa-play"></i>');
+  const audio = new Audio(audioUrl);
+  currentAudio = audio; currentSlug = slug;
+  fetch('/api/songs/' + slug + '/play', { method: 'POST' }).catch(() => {});
+
+  const title = song?.title || '', artist = song?.artist_name || '', cover = song?.cover_url || '';
+  player.innerHTML = `
+    <div class="gplayer-inner">
+      <div class="gplayer-info">
+        ${cover ? `<img src="${escHtml(cover)}" class="gplayer-cover" />` : `<div class="gplayer-cover gplayer-cover-ph"><i class="fas fa-music"></i></div>`}
+        <div>
+          <div class="gplayer-title">${escHtml(title)}</div>
+          <div class="gplayer-artist">${escHtml(artist)}</div>
+        </div>
+      </div>
+      <div class="gplayer-controls">
+        <button class="gplayer-btn" id="gp-prev" title="Önceki"><i class="fas fa-step-backward"></i></button>
+        <button class="gplayer-btn gplayer-play" id="gp-play"><i class="fas fa-pause"></i></button>
+        <button class="gplayer-btn" id="gp-next" title="Sonraki"><i class="fas fa-step-forward"></i></button>
+      </div>
+      <div class="gplayer-progress-wrap">
+        <span class="gplayer-time" id="gp-cur">0:00</span>
+        <div class="gplayer-bar-wrap">
+          <div class="gplayer-bar-bg">
+            <div class="gplayer-bar-fill" id="gp-fill" style="width:0%"></div>
+          </div>
+          <input type="range" class="gplayer-seek" id="gp-seek" min="0" max="100" value="0" step="0.1" />
+        </div>
+        <span class="gplayer-time" id="gp-dur">0:00</span>
+      </div>
+      <button class="gplayer-close" id="gp-close"><i class="fas fa-times"></i></button>
+    </div>`;
+  player.style.display = 'block';
+
+  function fmtTime(s) { const m=Math.floor(s/60); return m+':'+(Math.floor(s%60)+'').padStart(2,'0'); }
+
+  audio.addEventListener('loadedmetadata', () => { document.getElementById('gp-dur').textContent = fmtTime(audio.duration); });
+  audio.addEventListener('timeupdate', () => {
+    const pct = audio.duration ? (audio.currentTime/audio.duration)*100 : 0;
+    const fill = document.getElementById('gp-fill'); if(fill) fill.style.width = pct+'%';
+    const seek = document.getElementById('gp-seek'); if(seek) seek.value = pct;
+    const cur = document.getElementById('gp-cur'); if(cur) cur.textContent = fmtTime(audio.currentTime);
+  });
+  audio.addEventListener('ended', () => { const pb=document.getElementById('gp-play'); if(pb) pb.innerHTML='<i class="fas fa-play"></i>'; });
+
+  document.getElementById('gp-play').addEventListener('click', () => {
+    if (audio.paused) { audio.play(); document.getElementById('gp-play').innerHTML='<i class="fas fa-pause"></i>'; }
+    else { audio.pause(); document.getElementById('gp-play').innerHTML='<i class="fas fa-play"></i>'; }
+  });
+  document.getElementById('gp-seek').addEventListener('input', e => {
+    if (audio.duration) audio.currentTime = (parseFloat(e.target.value)/100)*audio.duration;
+  });
+  document.getElementById('gp-close').addEventListener('click', () => {
+    audio.pause(); currentAudio=null; player.style.display='none';
+  });
+
+  // Sync play button on detail page
+  const detailPlay = document.getElementById('detail-play-btn');
+  if (detailPlay) detailPlay.innerHTML = '<i class="fas fa-pause"></i> Durdur';
+
+  audio.play().catch(() => {});
+}
+
+async function renderMusicDetail(app, slug) {
+  app.innerHTML = '<div class="container page"><div class="loading-center"><div class="spinner"></div></div></div>';
+  let song;
+  try { song = await api('/songs/' + slug); } catch {
+    app.innerHTML = '<div class="container page"><div class="empty-state"><i class="fas fa-music"></i><p>Şarkı bulunamadı.</p></div></div>'; return;
+  }
+  document.title = `${song.title} – ${song.artist_name} | Demlik`;
+  const isOwn = song.song_type === 'own';
+  const hasLyrics = !!song.lyrics?.trim();
+
+  app.innerHTML = `<div class="container page">
+    <div class="music-detail-header">
+      <div class="music-detail-cover-wrap">
+        ${song.cover_url
+          ? `<img src="${escHtml(song.cover_url)}" class="music-detail-cover" />`
+          : `<div class="music-detail-cover music-detail-cover-ph"><i class="fas fa-music"></i></div>`}
+      </div>
+      <div class="music-detail-info">
+        <div class="music-detail-type-badge">${isOwn ? '<i class="fas fa-microphone"></i> Sanatçı Şarkısı' : '<i class="fas fa-share"></i> Paylaşılan Şarkı'}</div>
+        <div class="music-detail-title">${escHtml(song.title)}</div>
+        <div class="music-detail-artist">${escHtml(song.artist_name)}</div>
+        <div class="music-detail-meta">
+          ${song.genre ? `<span><i class="fas fa-tag"></i> ${escHtml(song.genre)}</span>` : ''}
+          ${song.distributor ? `<span><i class="fas fa-building"></i> ${escHtml(song.distributor)}</span>` : ''}
+          <span><i class="fas fa-headphones"></i> ${song.play_count} dinlenme</span>
+          <span><i class="fas fa-calendar"></i> ${formatDate(song.published_at)}</span>
+        </div>
+        <div class="music-player-box" id="music-player-box">
+          <audio id="detail-audio" src="${escHtml(song.audio_url)}" preload="metadata"></audio>
+          <div class="music-player-controls">
+            <button class="music-play-btn" id="detail-play-btn"><i class="fas fa-play"></i> Oynat</button>
+          </div>
+          <div class="music-progress-wrap">
+            <span class="music-time" id="dp-cur">0:00</span>
+            <div class="music-bar-bg">
+              <div class="music-bar-fill" id="dp-fill"></div>
+              <input type="range" class="music-seek" id="dp-seek" min="0" max="100" value="0" step="0.1" />
+            </div>
+            <span class="music-time" id="dp-dur">0:00</span>
+          </div>
+        </div>
+        ${!isOwn && song.share_reason ? `
+          <div class="music-share-reason">
+            <div class="music-share-reason-label"><i class="fas fa-question-circle"></i> Neden paylaştınız?</div>
+            <div class="music-share-reason-text">Cevap: ${escHtml(song.share_reason)}</div>
+          </div>` : ''}
+      </div>
+    </div>
+    ${hasLyrics ? `
+      <div class="music-lyrics-box">
+        <div class="music-lyrics-title"><i class="fas fa-align-left"></i> Şarkı Sözleri</div>
+        <div class="music-lyrics-text">${escHtml(song.lyrics)}</div>
+      </div>` : ''}
+  </div>`;
+
+  const audio = document.getElementById('detail-audio');
+  const playBtn = document.getElementById('detail-play-btn');
+  const fill = document.getElementById('dp-fill');
+  const seek = document.getElementById('dp-seek');
+  const curEl = document.getElementById('dp-cur');
+  const durEl = document.getElementById('dp-dur');
+
+  function fmt(s) { const m=Math.floor(s/60); return m+':'+(Math.floor(s%60)+'').padStart(2,'0'); }
+
+  audio.addEventListener('loadedmetadata', () => { if(durEl) durEl.textContent = fmt(audio.duration); });
+  audio.addEventListener('timeupdate', () => {
+    const pct = audio.duration ? (audio.currentTime/audio.duration)*100 : 0;
+    if(fill) fill.style.width = pct + '%';
+    if(seek) seek.value = pct;
+    if(curEl) curEl.textContent = fmt(audio.currentTime);
+  });
+  audio.addEventListener('ended', () => { playBtn.innerHTML = '<i class="fas fa-play"></i> Oynat'; });
+
+  let played = false;
+  playBtn.addEventListener('click', () => {
+    if (audio.paused) {
+      audio.play();
+      playBtn.innerHTML = '<i class="fas fa-pause"></i> Durdur';
+      if (!played) { fetch('/api/songs/'+slug+'/play', {method:'POST'}).catch(()=>{}); played=true; }
+    } else {
+      audio.pause();
+      playBtn.innerHTML = '<i class="fas fa-play"></i> Oynat';
+    }
+  });
+  seek?.addEventListener('input', e => { if(audio.duration) audio.currentTime=(parseFloat(e.target.value)/100)*audio.duration; });
+}
+
+// ===== ARTİST BAŞVURUSU =====
+async function renderArtistApply(app) {
+  if (!currentUser) { navigate('/giris'); return; }
+  document.title = 'Artist Başvurusu – Demlik';
+  let existing = null;
+  try { existing = await api('/artist/my-application'); } catch {}
+
+  const isPending = existing?.status === 'pending';
+  const isAccepted = existing?.status === 'accepted';
+  const isRejected = existing?.status === 'rejected';
+
+  if (isAccepted || currentUser.is_artist) {
+    app.innerHTML = `<div class="container page" style="max-width:600px;margin:0 auto">
+      <div style="text-align:center;padding:60px 20px">
+        <div style="font-size:48px;margin-bottom:16px">🎤</div>
+        <div style="font-size:22px;font-weight:700;margin-bottom:8px">Artist Rozetiniz Var!</div>
+        <p style="color:var(--text-secondary);margin-bottom:24px">Şarkı yüklemek için artist paneline gidin.</p>
+        <a href="/artist-panel" data-link class="btn btn-primary"><i class="fas fa-music"></i> Artist Paneli</a>
+      </div>
+    </div>`;
+    return;
+  }
+
+  app.innerHTML = `<div class="container page" style="max-width:600px;margin:0 auto">
+    <div class="page-title"><i class="fas fa-microphone" style="color:var(--accent-red2);margin-right:8px"></i>Artist Rozeti Başvurusu</div>
+    ${isPending ? `
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-body" style="text-align:center;padding:40px">
+          <div style="font-size:40px;margin-bottom:12px">⏳</div>
+          <div style="font-size:18px;font-weight:700">Başvurunuz Bekliyor</div>
+          <p style="color:var(--text-secondary);margin-top:8px">Ekibimiz başvurunuzu inceliyor. Onaylanınca bildirim alacaksınız.</p>
+        </div>
+      </div>` : ''}
+    ${isRejected ? `
+      <div class="card" style="margin-bottom:20px;border-color:rgba(220,38,38,0.4)">
+        <div class="card-body" style="padding:16px">
+          <div style="color:var(--accent-red2);font-weight:600"><i class="fas fa-times-circle"></i> Başvurunuz Reddedildi</div>
+          <p style="font-size:13px;color:var(--text-secondary);margin-top:6px">Yeniden başvurabilirsiniz.</p>
+        </div>
+      </div>` : ''}
+    ${!isPending ? `
+    <div class="card">
+      <div class="card-body">
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:20px">
+          Artist rozeti alarak kendi şarkılarınızı Demlik'te yayınlayabilirsiniz.
+        </p>
+        <div class="form-group"><label>Müzik Türünüz *</label>
+          <input id="apply-genre" placeholder="Pop, Rock, Hip-Hop, Elektronik..." />
+        </div>
+        <div class="form-group"><label>Örnek Şarkı URL (SoundCloud, YouTube vb.)</label>
+          <input id="apply-url" placeholder="https://soundcloud.com/..." />
+        </div>
+        <div class="form-group"><label>veya Örnek Şarkı Dosyası Yükle</label>
+          <input type="file" id="apply-file" accept="audio/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:10px;cursor:pointer" />
+        </div>
+        <div class="form-group"><label>Notunuz (isteğe bağlı)</label>
+          <textarea id="apply-note" rows="3" placeholder="Kendinizi kısaca tanıtın..."></textarea>
+        </div>
+        <button class="btn btn-primary" id="apply-submit" style="width:100%;justify-content:center">
+          <i class="fas fa-paper-plane"></i> Başvuruyu Gönder
+        </button>
+        <div id="apply-msg" style="margin-top:8px;font-size:12px"></div>
+      </div>
+    </div>` : ''}
+  </div>`;
+
+  document.getElementById('apply-submit')?.addEventListener('click', async () => {
+    const genre = document.getElementById('apply-genre')?.value.trim();
+    const url = document.getElementById('apply-url')?.value.trim();
+    const file = document.getElementById('apply-file')?.files[0];
+    const note = document.getElementById('apply-note')?.value.trim();
+    const msg = document.getElementById('apply-msg');
+    if (!genre) { msg.style.color='var(--accent-red2)'; msg.textContent='Müzik türü zorunlu'; return; }
+    if (!url && !file) { msg.style.color='var(--accent-red2)'; msg.textContent='URL veya dosya gerekli'; return; }
+    const btn = document.getElementById('apply-submit');
+    btn.disabled=true; btn.textContent='Gönderiliyor...';
+    try {
+      const fd = new FormData();
+      fd.append('genre', genre);
+      fd.append('sample_song_url', url||'');
+      fd.append('note', note||'');
+      if (file) fd.append('sample_file', file);
+      await apiForm('/artist/apply', fd);
+      msg.style.color='var(--accent-red2)'; // green
+      app.innerHTML = `<div class="container page" style="max-width:600px;margin:0 auto;text-align:center;padding:60px 20px">
+        <div style="font-size:48px">⏳</div>
+        <div style="font-size:22px;font-weight:700;margin-top:12px">Başvurunuz Alındı!</div>
+        <p style="color:var(--text-secondary);margin-top:8px">Ekibimiz inceleyecek, onaylanınca bildirim alırsınız.</p>
+        <a href="/" data-link class="btn btn-outline" style="margin-top:20px">Ana Sayfaya Dön</a>
+      </div>`;
+    } catch(e) { msg.style.color='var(--accent-red2)'; msg.textContent=e.message; btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane"></i> Başvuruyu Gönder'; }
+  });
+}
+
+// ===== ARTİST PANELİ =====
+async function renderArtistPanel(app) {
+  if (!currentUser) { navigate('/giris'); return; }
+  if (!currentUser.is_artist) { navigate('/artist-basvuru'); return; }
+  document.title = 'Artist Panel – Demlik';
+
+  let rules = { own_rules: '', other_rules: '' };
+  try { rules = await api('/music-rules'); } catch {}
+
+  app.innerHTML = `<div class="container page" style="max-width:700px;margin:0 auto">
+    <div class="page-title"><i class="fas fa-music" style="color:var(--accent-red2);margin-right:8px"></i>Artist Paneli</div>
+    <div class="card">
+      <div class="card-body">
+        <div class="form-group">
+          <label>Şarkı Türü *</label>
+          <div style="display:flex;gap:10px">
+            <label class="checkbox-label" style="flex:1;padding:12px;background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;cursor:pointer">
+              <input type="radio" name="song-type" id="st-own" value="own" checked style="width:auto" /> Kendi Şarkım
+            </label>
+            <label class="checkbox-label" style="flex:1;padding:12px;background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;cursor:pointer">
+              <input type="radio" name="song-type" id="st-other" value="other" style="width:auto" /> Başkasının Şarkısı
+            </label>
+          </div>
+        </div>
+        <div id="own-fields">
+          <div class="form-group"><label>Yayımlayıcı / Dağıtıcı İsmi</label><input id="s-distributor" placeholder="Kendi adın ya da şirket adı" /></div>
+          <div class="form-group"><label>Şarkı Adı *</label><input id="s-title" /></div>
+          <div class="form-group"><label>Şarkı Türü</label><input id="s-genre" placeholder="Pop, Rock, Elektronik..." /></div>
+          <div class="form-group"><label>Şarkı Dosyası * (MP3/WAV)</label><input type="file" id="s-audio" accept="audio/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:10px;cursor:pointer" /></div>
+          <div class="form-group"><label>Kapak Fotoğrafı</label><input type="file" id="s-cover" accept="image/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:10px;cursor:pointer" /></div>
+          <div class="form-group"><label>Şarkı Sözleri (isteğe bağlı)</label><textarea id="s-lyrics" rows="6" placeholder="Şarkı sözlerini buraya yapıştırın..."></textarea></div>
+          <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-secondary);max-height:120px;overflow-y:auto">${escHtml(rules.own_rules)}</div>
+          <label class="checkbox-label" style="margin-bottom:16px"><input type="checkbox" id="s-rules-own" style="width:auto" /> Şarkı yayınlama kurallarını okudum ve kabul ediyorum</label>
+        </div>
+        <div id="other-fields" style="display:none">
+          <div class="form-group"><label>Şarkı Adı *</label><input id="s-title-o" /></div>
+          <div class="form-group"><label>Şarkı Sahibi (Sanatçı) *</label><input id="s-artist-o" /></div>
+          <div class="form-group"><label>Kapak Fotoğrafı</label><input type="file" id="s-cover-o" accept="image/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:10px;cursor:pointer" /></div>
+          <div class="form-group"><label>Şarkı Sözleri (isteğe bağlı)</label><textarea id="s-lyrics-o" rows="6" placeholder="Şarkı sözlerini buraya yapıştırın..."></textarea></div>
+          <div class="form-group"><label>Şarkı Dosyası * (MP3/WAV)</label><input type="file" id="s-audio-o" accept="audio/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:10px;cursor:pointer" /></div>
+          <div class="form-group"><label>Neden paylaştınız? *</label><textarea id="s-reason" rows="3" placeholder="Bu şarkıyı neden topluluğumuzla paylaşmak istediniz?"></textarea></div>
+          <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-secondary);max-height:120px;overflow-y:auto">${escHtml(rules.other_rules)}</div>
+          <label class="checkbox-label" style="margin-bottom:16px"><input type="checkbox" id="s-rules-other" style="width:auto" /> Başkasının şarkısını paylaşma kurallarını okudum ve kabul ediyorum</label>
+        </div>
+        <button class="btn btn-primary" id="song-upload-btn" style="width:100%;justify-content:center"><i class="fas fa-upload"></i> Şarkıyı Yayınla</button>
+        <div id="song-msg" style="margin-top:8px;font-size:12px"></div>
+      </div>
+    </div>
+  </div>`;
+
+  document.querySelectorAll('[name="song-type"]').forEach(r => r.addEventListener('change', () => {
+    const own = r.value === 'own';
+    document.getElementById('own-fields').style.display = own ? '' : 'none';
+    document.getElementById('other-fields').style.display = own ? 'none' : '';
+  }));
+
+  document.getElementById('song-upload-btn').addEventListener('click', async () => {
+    const isOwn = document.getElementById('st-own').checked;
+    const msg = document.getElementById('song-msg');
+    const btn = document.getElementById('song-upload-btn');
+    const rules_ok = isOwn ? document.getElementById('s-rules-own')?.checked : document.getElementById('s-rules-other')?.checked;
+    if (!rules_ok) { msg.style.color='var(--accent-red2)'; msg.textContent='Kuralları kabul etmelisiniz'; return; }
+    const fd = new FormData();
+    fd.append('song_type', isOwn ? 'own' : 'other');
+    fd.append('rules_accepted', '1');
+    if (isOwn) {
+      const title = document.getElementById('s-title')?.value.trim();
+      if (!title) { msg.style.color='var(--accent-red2)'; msg.textContent='Şarkı adı gerekli'; return; }
+      const audio = document.getElementById('s-audio')?.files[0];
+      if (!audio) { msg.style.color='var(--accent-red2)'; msg.textContent='Ses dosyası gerekli'; return; }
+      fd.append('title', title);
+      fd.append('artist_name', currentUser.username);
+      fd.append('distributor', document.getElementById('s-distributor')?.value.trim()||'');
+      fd.append('genre', document.getElementById('s-genre')?.value.trim()||'');
+      fd.append('lyrics', document.getElementById('s-lyrics')?.value.trim()||'');
+      fd.append('audio', audio);
+      const cover = document.getElementById('s-cover')?.files[0]; if(cover) fd.append('cover', cover);
+    } else {
+      const title = document.getElementById('s-title-o')?.value.trim();
+      const artist = document.getElementById('s-artist-o')?.value.trim();
+      if (!title||!artist) { msg.style.color='var(--accent-red2)'; msg.textContent='Başlık ve sanatçı adı gerekli'; return; }
+      const audio = document.getElementById('s-audio-o')?.files[0];
+      if (!audio) { msg.style.color='var(--accent-red2)'; msg.textContent='Ses dosyası gerekli'; return; }
+      fd.append('title', title); fd.append('artist_name', artist);
+      fd.append('lyrics', document.getElementById('s-lyrics-o')?.value.trim()||'');
+      fd.append('share_reason', document.getElementById('s-reason')?.value.trim()||'');
+      fd.append('audio', audio);
+      const cover = document.getElementById('s-cover-o')?.files[0]; if(cover) fd.append('cover', cover);
+    }
+    btn.disabled=true; btn.innerHTML='<div class="spinner" style="width:14px;height:14px"></div> Yükleniyor...';
+    try {
+      const data = await apiForm('/songs', fd);
+      navigate('/muzik/' + data.slug);
+    } catch(e) { msg.style.color='var(--accent-red2)'; msg.textContent=e.message; btn.disabled=false; btn.innerHTML='<i class="fas fa-upload"></i> Şarkıyı Yayınla'; }
+  });
 }

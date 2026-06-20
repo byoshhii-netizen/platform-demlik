@@ -348,6 +348,42 @@ async function initDb() {
 
     ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
     ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_permissions_id BIGINT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_artist INTEGER DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS artist_since TIMESTAMP;
+
+    CREATE TABLE IF NOT EXISTS artist_applications (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      genre TEXT NOT NULL,
+      sample_song_url TEXT NOT NULL,
+      sample_song_file TEXT DEFAULT '',
+      note TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending',
+      reviewed_by BIGINT,
+      reviewed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS songs (
+      id BIGSERIAL PRIMARY KEY,
+      uploader_id BIGINT NOT NULL,
+      song_type TEXT NOT NULL DEFAULT 'own',
+      title TEXT NOT NULL,
+      artist_name TEXT NOT NULL,
+      distributor TEXT DEFAULT '',
+      genre TEXT DEFAULT '',
+      lyrics TEXT DEFAULT '',
+      cover_url TEXT DEFAULT '',
+      audio_url TEXT NOT NULL,
+      share_reason TEXT DEFAULT '',
+      play_count INTEGER DEFAULT 0,
+      slug TEXT UNIQUE,
+      status TEXT DEFAULT 'active',
+      published_at TIMESTAMP DEFAULT NOW(),
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY(uploader_id) REFERENCES users(id) ON DELETE SET NULL
+    );
   `);
 
   // Seed default levels

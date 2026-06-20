@@ -233,11 +233,12 @@ const storage = USE_CLOUDINARY
     });
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB (audio için)
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error('Sadece resim dosyaları kabul edilir (jpg, png, gif, webp)'));
+    const allowedImages = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+    const allowedAudio = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/flac', 'audio/aac', 'audio/x-wav', 'audio/wave'];
+    if (allowedImages.includes(file.mimetype) || allowedAudio.includes(file.mimetype) || file.mimetype.startsWith('audio/')) cb(null, true);
+    else cb(new Error('Sadece resim veya ses dosyaları kabul edilir'));
   }
 });
 
@@ -250,8 +251,11 @@ async function handleUpload(file) {
       }
       const ext = path.extname(file.originalname).replace('.', '') || 'jpg';
       const public_id = 'demlik/' + uuidv4();
+      const isAudio = file.mimetype && file.mimetype.startsWith('audio/');
       const stream = cloudinary.uploader.upload_stream(
-        { public_id, resource_type: 'image', quality: 'auto', fetch_format: 'auto' },
+        isAudio
+          ? { public_id, resource_type: 'video' } // Cloudinary audio için 'video' resource type kullanır
+          : { public_id, resource_type: 'image', quality: 'auto', fetch_format: 'auto' },
         (err, result) => {
           if (err) return reject(new Error('Cloudinary yükleme hatası: ' + (err.message || JSON.stringify(err))));
           if (!result?.secure_url) return reject(new Error('Cloudinary URL alınamadı'));
@@ -1235,6 +1239,178 @@ app.post('/api/admin/user/:id/set-admin', adminMiddleware, async (req, res) => {
   await logAction('admin', is_admin ? 'grant_admin' : 'revoke_admin', rows[0].username);
   res.json({ ok: true });
 });
+
+// ===== MÜZİK SİSTEMİ =====
+function makeSongSlug(title, id) {
+  const base = slugify(title, { lower: true, strict: false, locale: 'tr', replacement: '-' })
+    .replace(/[^a-z0-9\-]/g, '').replace(/-+/g, '-').substring(0, 60);
+  return base + '-' + id;
+}
+
+// Artist başvurusu
+app.post('/api/artist/apply', authMiddleware, upload.single('sample_file'), async (req, res) => {
+  const { genre, sample_song_url, note } = req.body;
+  if (!genre) return res.status(400).json({ error: 'Tür gerekli' });
+  if (!sample_song_url && !req.file) return res.status(400).json({ error: 'Örnek şarkı gerekli' });
+  const { rows: existing } = await query('SELECT id, status FROM artist_applications WHERE user_id=$1 ORDER BY id DESC LIMIT 1', [req.user.id]);
+  if (existing.length && existing[0].status === 'pending') return res.status(400).json({ error: 'Zaten bekleyen bir başvurunuz var' });
+  let sampleFile = '';
+  if (req.file) { try { sampleFile = await handleUpload(req.file); } catch {} }
+  const { rows } = await query(
+    'INSERT INTO artist_applications (user_id, genre, sample_song_url, sample_song_file, note) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+    [req.user.id, genre, sample_song_url || '', sampleFile, note || '']
+  );
+  res.json(rows[0]);
+});
+
+app.get('/api/artist/my-application', authMiddleware, async (req, res) => {
+  const { rows } = await query('SELECT * FROM artist_applications WHERE user_id=$1 ORDER BY id DESC LIMIT 1', [req.user.id]);
+  res.json(rows[0] || null);
+});
+
+// Şarkı yükleme (sadece artist)
+app.post('/api/songs', authMiddleware, upload.fields([
+  { name: 'audio', maxCount: 1 },
+  { name: 'cover', maxCount: 1 }
+]), async (req, res) => {
+  if (!req.user.is_artist) return res.status(403).json({ error: 'Artist rozeti gerekli' });
+  const { song_type, title, artist_name, distributor, genre, lyrics, share_reason, rules_accepted } = req.body;
+  if (!rules_accepted) return res.status(400).json({ error: 'Kuralları kabul etmelisiniz' });
+  if (!title || !artist_name) return res.status(400).json({ error: 'Başlık ve sanatçı adı gerekli' });
+  if (!req.files?.audio?.[0]) return res.status(400).json({ error: 'Ses dosyası gerekli' });
+  let audio_url = '', cover_url = '';
+  try { audio_url = await handleUpload(req.files.audio[0]); } catch (e) { return res.status(500).json({ error: 'Ses yüklenemedi: ' + e.message }); }
+  if (req.files?.cover?.[0]) { try { cover_url = await handleUpload(req.files.cover[0]); } catch {} }
+  const { rows } = await query(
+    `INSERT INTO songs (uploader_id, song_type, title, artist_name, distributor, genre, lyrics, cover_url, audio_url, share_reason, slug)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'tmp') RETURNING id`,
+    [req.user.id, song_type || 'own', title, artist_name, distributor || '', genre || '', lyrics || '', cover_url, audio_url, share_reason || '']
+  );
+  const id = rows[0].id;
+  const slug = makeSongSlug(title, id);
+  await query('UPDATE songs SET slug=$1 WHERE id=$2', [slug, id]);
+  await logAction(req.user.username, 'upload_song', slug);
+  res.json({ ok: true, slug });
+});
+
+// Tüm şarkılar (liste)
+app.get('/api/songs', async (req, res) => {
+  const { q, genre, artist, distributor } = req.query;
+  let where = "WHERE s.status='active'";
+  const params = [];
+  if (q) {
+    params.push(`%${q}%`);
+    where += ` AND (s.title ILIKE $${params.length} OR s.artist_name ILIKE $${params.length} OR s.lyrics ILIKE $${params.length} OR s.distributor ILIKE $${params.length})`;
+  }
+  if (genre && !q) { params.push(`%${genre}%`); where += ` AND s.genre ILIKE $${params.length}`; }
+  if (artist && !q) { params.push(`%${artist}%`); where += ` AND s.artist_name ILIKE $${params.length}`; }
+  if (distributor && !q) { params.push(`%${distributor}%`); where += ` AND s.distributor ILIKE $${params.length}`; }
+  const { rows } = await query(
+    `SELECT s.id, s.title, s.artist_name, s.distributor, s.genre, s.cover_url, s.audio_url,
+            s.play_count, s.slug, s.song_type, s.published_at, s.share_reason,
+            u.username as uploader, u.avatar as uploader_avatar
+     FROM songs s LEFT JOIN users u ON s.uploader_id=u.id
+     ${where} ORDER BY s.published_at DESC LIMIT 100`,
+    params
+  );
+  res.json(rows);
+});
+
+// Tek şarkı
+app.get('/api/songs/:slug', async (req, res) => {
+  const { rows } = await query(
+    `SELECT s.*, u.username as uploader, u.avatar as uploader_avatar, u.is_artist
+     FROM songs s LEFT JOIN users u ON s.uploader_id=u.id
+     WHERE s.slug=$1`,
+    [req.params.slug]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Şarkı bulunamadı' });
+  res.json(rows[0]);
+});
+
+// Dinlenme sayısı artır
+app.post('/api/songs/:slug/play', async (req, res) => {
+  await query('UPDATE songs SET play_count=play_count+1 WHERE slug=$1', [req.params.slug]);
+  res.json({ ok: true });
+});
+
+// Admin: tüm şarkılar
+app.get('/api/admin/songs', adminMiddleware, async (req, res) => {
+  const { rows } = await query(
+    `SELECT s.*, u.username as uploader FROM songs s LEFT JOIN users u ON s.uploader_id=u.id ORDER BY s.created_at DESC`
+  );
+  res.json(rows);
+});
+
+// Admin: şarkı güncelle
+app.put('/api/admin/songs/:id', adminMiddleware, upload.fields([
+  { name: 'audio', maxCount: 1 },
+  { name: 'cover', maxCount: 1 }
+]), async (req, res) => {
+  const { title, artist_name, distributor, genre, lyrics, play_count, status } = req.body;
+  const song = (await query('SELECT * FROM songs WHERE id=$1', [req.params.id])).rows[0];
+  if (!song) return res.status(404).json({ error: 'Şarkı bulunamadı' });
+  let audio_url = song.audio_url, cover_url = song.cover_url;
+  if (req.files?.audio?.[0]) { try { audio_url = await handleUpload(req.files.audio[0]); } catch {} }
+  if (req.files?.cover?.[0]) { try { cover_url = await handleUpload(req.files.cover[0]); } catch {} }
+  await query(
+    `UPDATE songs SET title=$1, artist_name=$2, distributor=$3, genre=$4, lyrics=$5,
+     play_count=$6, status=$7, audio_url=$8, cover_url=$9 WHERE id=$10`,
+    [title || song.title, artist_name || song.artist_name, distributor ?? song.distributor,
+     genre ?? song.genre, lyrics ?? song.lyrics, parseInt(play_count) || song.play_count,
+     status || song.status, audio_url, cover_url, req.params.id]
+  );
+  res.json({ ok: true });
+});
+
+// Admin: şarkı sil
+app.delete('/api/admin/songs/:id', adminMiddleware, async (req, res) => {
+  await query('DELETE FROM songs WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// Admin: artist başvuruları
+app.get('/api/admin/artist-applications', adminMiddleware, async (req, res) => {
+  const { rows } = await query(
+    `SELECT a.*, u.username, u.avatar FROM artist_applications a
+     LEFT JOIN users u ON a.user_id=u.id ORDER BY a.created_at DESC`
+  );
+  res.json(rows);
+});
+
+// Admin: başvuru onayla/reddet
+app.post('/api/admin/artist-applications/:id/review', adminMiddleware, async (req, res) => {
+  const { status } = req.body; // accepted | rejected
+  if (!['accepted', 'rejected'].includes(status)) return res.status(400).json({ error: 'Geçersiz durum' });
+  const { rows } = await query('SELECT * FROM artist_applications WHERE id=$1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'Başvuru bulunamadı' });
+  await query('UPDATE artist_applications SET status=$1, reviewed_at=NOW() WHERE id=$2', [status, req.params.id]);
+  if (status === 'accepted') {
+    await query('UPDATE users SET is_artist=1, artist_since=NOW() WHERE id=$1', [rows[0].user_id]);
+  }
+  res.json({ ok: true });
+});
+
+// Şarkı yükleme kuralları
+app.get('/api/music-rules', async (req, res) => {
+  const { rows: own } = await query("SELECT value FROM settings WHERE key='music_own_rules'");
+  const { rows: other } = await query("SELECT value FROM settings WHERE key='music_other_rules'");
+  res.json({
+    own_rules: own[0]?.value || 'Kendi şarkılarınızı yüklerken telif hakkına sahip olmanız gerekmektedir.',
+    other_rules: other[0]?.value || 'Başkasının şarkısını paylaşırken kaynak belirtmek zorunludur.'
+  });
+});
+
+// SEO route'ları müzik için
+app.get('/muzikler', (req, res) => res.send(injectMeta('Müzikler – Demlik', 'Demlik müzik platformu', `${SITE_URL}/muzikler`, '')));
+app.get('/muzik/:slug', async (req, res) => {
+  const { rows } = await query('SELECT * FROM songs WHERE slug=$1', [req.params.slug]);
+  if (!rows.length) return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const s = rows[0];
+  res.send(injectMeta(`${s.title} – ${s.artist_name} | Demlik`, `${s.artist_name} - ${s.title}`, `${SITE_URL}/muzik/${s.slug}`, s.cover_url));
+});
+app.get('/artist-basvuru', (req, res) => res.send(injectMeta('Artist Başvurusu – Demlik', 'Demlik artist rozetine başvur', `${SITE_URL}/artist-basvuru`, '')));
+app.get('/artist-panel', (req, res) => res.send(injectMeta('Artist Panel – Demlik', 'Şarkı yükle ve yönet', `${SITE_URL}/artist-panel`, '')));
 
 // ===== ADMIN YETKİ SİSTEMİ =====
 app.get('/api/admin/permissions/:userId', adminMiddleware, async (req, res) => {
