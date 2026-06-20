@@ -276,31 +276,65 @@ app.get('/robots.txt', (req, res) => {
 });
 
 app.get('/sitemap.xml', async (req, res) => {
-  const [forums, books, groups, users] = await Promise.all([
-    query('SELECT slug, title, banner_image, updated_at FROM forums').then(r => r.rows),
-    query('SELECT slug, updated_at FROM books').then(r => r.rows),
-    query('SELECT slug FROM groups').then(r => r.rows),
-    query('SELECT username FROM users').then(r => r.rows),
+  const [forums, books, groups, users, songs] = await Promise.all([
+    query('SELECT slug, title, banner_image, updated_at FROM forums ORDER BY updated_at DESC LIMIT 5000').then(r => r.rows),
+    query('SELECT slug, updated_at FROM books ORDER BY updated_at DESC LIMIT 2000').then(r => r.rows),
+    query('SELECT slug FROM groups LIMIT 2000').then(r => r.rows),
+    query('SELECT username FROM users WHERE banned=0 LIMIT 5000').then(r => r.rows),
+    query("SELECT slug, title, cover_url, published_at FROM songs WHERE status='active' ORDER BY published_at DESC LIMIT 2000").then(r => r.rows),
   ]);
+  const now = new Date().toISOString();
   const staticUrls = [
-    { url: '/', priority: '1.0', changefreq: 'daily' },
-    { url: '/forum', priority: '0.9', changefreq: 'hourly' },
-    { url: '/kitaplar', priority: '0.8', changefreq: 'daily' },
-    { url: '/gruplar', priority: '0.7', changefreq: 'daily' }
-  ].map(u => `  <url><loc>${SITE_URL}${u.url}</loc><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`).join('\n');
+    { url: '/',          priority: '1.0', changefreq: 'daily'  },
+    { url: '/forum',     priority: '0.9', changefreq: 'hourly' },
+    { url: '/kitaplar',  priority: '0.8', changefreq: 'daily'  },
+    { url: '/gruplar',   priority: '0.7', changefreq: 'daily'  },
+    { url: '/muzikler',  priority: '0.7', changefreq: 'daily'  },
+  ].map(u => `  <url><loc>${SITE_URL}${u.url}</loc><lastmod>${now}</lastmod><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`).join('\n');
+
   const forumUrls = forums.map(f => {
-    const imgTag = f.banner_image ? `\n    <image:image><image:loc>${escapeHtml(f.banner_image)}</image:loc><image:title>${escapeHtml(f.title)}</image:title></image:image>` : '';
+    const imgTag = f.banner_image
+      ? `\n    <image:image><image:loc>${escapeHtml(f.banner_image)}</image:loc><image:title>${escapeHtml(f.title)}</image:title></image:image>`
+      : '';
     const mod = f.updated_at ? `\n    <lastmod>${new Date(f.updated_at).toISOString()}</lastmod>` : '';
-    return `  <url><loc>${SITE_URL}/forum/${f.slug}</loc>${mod}<changefreq>weekly</changefreq><priority>0.8</priority>${imgTag}\n  </url>`;
+    return `  <url><loc>${SITE_URL}/forum/${escapeHtml(f.slug)}</loc>${mod}\n    <changefreq>weekly</changefreq><priority>0.8</priority>${imgTag}\n  </url>`;
   }).join('\n');
+
   const bookUrls = books.map(b => {
     const mod = b.updated_at ? `\n    <lastmod>${new Date(b.updated_at).toISOString()}</lastmod>` : '';
-    return `  <url><loc>${SITE_URL}/kitap/${b.slug}</loc>${mod}<changefreq>weekly</changefreq><priority>0.7</priority>\n  </url>`;
+    return `  <url><loc>${SITE_URL}/kitap/${escapeHtml(b.slug)}</loc>${mod}\n    <changefreq>weekly</changefreq><priority>0.7</priority>\n  </url>`;
   }).join('\n');
-  const groupUrls = groups.map(g => `  <url><loc>${SITE_URL}/grup/${g.slug}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>`).join('\n');
-  const profileUrls = users.map(u => `  <url><loc>${SITE_URL}/profil/${u.username}</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>`).join('\n');
+
+  const groupUrls = groups.map(g =>
+    `  <url><loc>${SITE_URL}/grup/${escapeHtml(g.slug)}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>`
+  ).join('\n');
+
+  const profileUrls = users.map(u =>
+    `  <url><loc>${SITE_URL}/profil/${escapeHtml(u.username)}</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>`
+  ).join('\n');
+
+  const songUrls = songs.map(s => {
+    const mod = s.published_at ? `\n    <lastmod>${new Date(s.published_at).toISOString()}</lastmod>` : '';
+    const imgTag = s.cover_url
+      ? `\n    <image:image><image:loc>${escapeHtml(s.cover_url)}</image:loc><image:title>${escapeHtml(s.title)}</image:title></image:image>`
+      : '';
+    return `  <url><loc>${SITE_URL}/muzik/${escapeHtml(s.slug)}</loc>${mod}\n    <changefreq>monthly</changefreq><priority>0.6</priority>${imgTag}\n  </url>`;
+  }).join('\n');
+
   res.type('application/xml');
-  res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${staticUrls}\n${forumUrls}\n${bookUrls}\n${groupUrls}\n${profileUrls}\n</urlset>`);
+  res.set('Cache-Control', 'public, max-age=3600'); // 1 saat cache — sık değişmiyor
+  res.send([
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
+    '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">',
+    staticUrls,
+    forumUrls,
+    bookUrls,
+    groupUrls,
+    profileUrls,
+    songUrls,
+    '</urlset>'
+  ].join('\n'));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
