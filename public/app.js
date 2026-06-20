@@ -1069,7 +1069,7 @@ async function renderPageReader(app, bookSlug, pageSlug) {
         <div class="ebook-page-content" id="ebook-content" style="font-size:${fontSize}px">
           ${page.image_url ? `<img src="${escHtml(page.image_url)}" class="ebook-page-image" alt="" />` : ''}
           <div style="font-size:1.3em;font-weight:700;margin-bottom:24px;color:#f0e8dc;font-family:'Georgia',serif">${escHtml(page.title)}</div>
-          ${escHtml(page.content)}
+          <div class="book-text">${escHtml(page.content.trim())}</div>
         </div>
 
         <!-- Alt Navigasyon -->

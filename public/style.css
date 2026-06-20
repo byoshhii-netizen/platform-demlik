@@ -546,11 +546,13 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   color: #e8ddd0;
   font-family: 'Georgia', serif;
   min-height: 500px;
-  white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
   max-width: 100%;
   overflow-x: hidden;
+}
+.ebook-page-content .book-text {
+  white-space: pre-wrap;
 }
 @media (max-width: 600px) {
   .ebook-page-content { padding: 20px 16px; font-size: 15px; }
