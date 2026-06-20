@@ -198,7 +198,6 @@ async function renderDashboard(main) {
       </div>
     </div>`;
 }
-}
 
 // ===== USERS =====
 async function renderUsers(main) {
