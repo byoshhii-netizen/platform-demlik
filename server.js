@@ -147,6 +147,12 @@ async function optionalAuth(req, res, next) {
 }
 
 async function adminMiddleware(req, res, next) {
+  // IP kontrolü — ADMIN_IPS set edilmişse API'yi de koru
+  const allowed = getAdminIPs();
+  if (allowed.length > 0) {
+    const clientIP = (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.ip || '').split(',')[0].trim();
+    if (!allowed.includes(clientIP)) return res.status(404).json({ error: 'Not found' });
+  }
   const token = req.headers['x-admin-token'];
   if (!token) return res.status(401).json({ error: 'Admin token gerekli' });
   const { rows } = await query("SELECT value FROM settings WHERE key='admin_password'");
@@ -1188,6 +1194,20 @@ app.post('/api/admin/settings', adminMiddleware, async (req, res) => {
   if (key === 'admin_password') val = hashPassword(value);
   await query('INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value', [key, val]);
   res.json({ ok: true });
+});
+
+// Logo dosya yükleme (cihazdan)
+app.post('/api/admin/upload-logo', adminMiddleware, upload.single('logo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Dosya bulunamadı' });
+  const mime = req.file.mimetype;
+  if (!mime.startsWith('image/')) return res.status(400).json({ error: 'Sadece resim dosyası yükleyebilirsiniz' });
+  try {
+    const url = await handleUpload(req.file);
+    await query("INSERT INTO settings (key,value) VALUES ('site_logo',$1) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value", [url]);
+    res.json({ ok: true, url });
+  } catch (e) {
+    res.status(500).json({ error: 'Logo yükleme hatası: ' + e.message });
+  }
 });
 
 app.get('/api/kvkk', async (req, res) => {

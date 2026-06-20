@@ -754,7 +754,151 @@ async function renderAdminMessages(main) {
 // ===== SETTINGS =====
 async function renderSettings(main) {
   let settings = {};
-  try { const rows = await adminApi('/settings'); rows.forEach(r => { settings[r.key]=r.value; }); } catch {}
+  try { const rows = await adminApi('/settings'); settings = rows; } catch {}
+
+  main.innerHTML = `
+    <div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-cog"></i></div> Site Ayarları</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-header"><span><i class="fas fa-palette" style="color:var(--red2);margin-right:8px"></i>Genel</span></div>
+        <div class="card-body">
+          <div class="form-group"><label>Site Adı</label><input id="s-sitename" value="${escHtml(settings['site_name']||'Demlik')}" /></div>
+
+          <div class="form-group">
+            <label>Site Logosu</label>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+              <div id="logo-preview" style="width:52px;height:52px;border-radius:10px;border:1px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg4)">
+                ${settings['site_logo'] ? `<img src="${escHtml(settings['site_logo'])}" style="width:100%;height:100%;object-fit:contain" />` : `<i class="fas fa-image" style="color:var(--text3)"></i>`}
+              </div>
+              <div style="flex:1">
+                <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Cihazınızdan PNG, JPG veya SVG yükleyin</div>
+                <label for="logo-file-input" class="btn btn-outline btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                  <i class="fas fa-upload"></i> Dosya Seç
+                </label>
+                <input type="file" id="logo-file-input" accept="image/*" style="display:none" />
+              </div>
+            </div>
+            <div id="logo-filename" style="font-size:11px;color:var(--text3);margin-bottom:6px"></div>
+            <button class="btn btn-primary btn-sm" id="logo-upload-btn" style="display:none"><i class="fas fa-check"></i> Logoyu Kaydet</button>
+            <div id="logo-msg" class="form-error mt-4"></div>
+          </div>
+
+          <div class="form-group"><label>Site Açıklaması</label><textarea id="s-desc" rows="3">${escHtml(settings['site_description']||'')}</textarea></div>
+          <button class="btn btn-primary" id="s-general-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
+          <div id="s-general-msg" class="form-error mt-4"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span><i class="fas fa-lock" style="color:var(--red2);margin-right:8px"></i>Güvenlik</span></div>
+        <div class="card-body">
+          <div class="form-group"><label>Yeni Admin Şifresi</label><input id="s-newpw" type="password" placeholder="Boş bırakırsan değişmez" /></div>
+          <div class="form-group"><label>Şifreyi Onayla</label><input id="s-newpw2" type="password" placeholder="••••••" /></div>
+          <button class="btn btn-primary" id="s-pw-save" style="width:100%;justify-content:center"><i class="fas fa-key"></i> Şifreyi Güncelle</button>
+          <div id="s-pw-msg" class="form-error mt-4"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span><i class="fas fa-file-alt" style="color:var(--red2);margin-right:8px"></i>Footer</span></div>
+        <div class="card-body">
+          <div class="form-group"><label>Footer Yazısı</label><input id="s-footer" value="${escHtml(settings['footer_copyright_text']||'')}" placeholder="© Copyright 2026" /></div>
+          <label class="checkbox-label" style="margin-bottom:12px">
+            <input type="checkbox" id="s-footer-created" ${settings['footer_created_visible']!=='0'?'checked':''} />
+            "Created By" yazısını göster
+          </label>
+          <button class="btn btn-primary" id="s-footer-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
+          <div id="s-footer-msg" class="form-error mt-4"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span><i class="fas fa-shield-halved" style="color:var(--red2);margin-right:8px"></i>KVKK Metni</span></div>
+        <div class="card-body">
+          <div class="form-group"><textarea id="s-kvkk" rows="6">${escHtml(settings['kvkk_text']||'')}</textarea></div>
+          <button class="btn btn-primary" id="s-kvkk-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
+          <div id="s-kvkk-msg" class="form-error mt-4"></div>
+        </div>
+      </div>
+    </div>`;
+
+  // Logo dosya seçici
+  const logoInput = document.getElementById('logo-file-input');
+  logoInput.addEventListener('change', () => {
+    const file = logoInput.files[0];
+    if (!file) return;
+    document.getElementById('logo-filename').textContent = file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
+    document.getElementById('logo-upload-btn').style.display = 'inline-flex';
+    // Anlık önizleme
+    const reader = new FileReader();
+    reader.onload = e => {
+      const prev = document.getElementById('logo-preview');
+      if (prev) prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:contain" />`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('logo-upload-btn').addEventListener('click', async () => {
+    const file = logoInput.files[0];
+    const msgEl = document.getElementById('logo-msg');
+    if (!file) { msgEl.textContent = 'Dosya seçin'; return; }
+    const btn = document.getElementById('logo-upload-btn');
+    btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div> Yükleniyor...';
+    msgEl.textContent = '';
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      const res = await fetch('/api/admin/upload-logo', {
+        method: 'POST',
+        headers: { 'X-Admin-Token': adminToken },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Hata');
+      toast('Logo güncellendi! Sayfayı yenileyin.');
+      msgEl.style.color = 'var(--green)';
+      msgEl.textContent = '✓ Logo başarıyla kaydedildi';
+    } catch (e) {
+      msgEl.style.color = 'var(--red2)';
+      msgEl.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Logoyu Kaydet';
+    }
+  });
+
+  async function saveSetting(key, value, msgEl) {
+    try {
+      await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json','X-Admin-Token':adminToken}, body:JSON.stringify({key,value}) });
+      toast('Kaydedildi');
+    } catch(e) { if(msgEl) msgEl.textContent = e.message; }
+  }
+
+  $('#s-general-save').addEventListener('click', async () => {
+    const msg = $('#s-general-msg');
+    await saveSetting('site_name', $('#s-sitename').value.trim(), msg);
+    await saveSetting('site_description', $('#s-desc').value.trim(), msg);
+  });
+
+  $('#s-pw-save').addEventListener('click', async () => {
+    const msg = $('#s-pw-msg');
+    const pw = $('#s-newpw').value, pw2 = $('#s-newpw2').value;
+    if (!pw) { msg.textContent='Şifre boş olamaz'; return; }
+    if (pw !== pw2) { msg.textContent='Şifreler eşleşmiyor'; return; }
+    const msgBuf = new TextEncoder().encode(pw);
+    const hashBuf = await crypto.subtle.digest('SHA-256', msgBuf);
+    const hashHex = Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    await saveSetting('admin_password', hashHex, msg);
+    adminToken = hashHex; sessionStorage.setItem('admin_token', adminToken);
+    msg.style.color='var(--green)'; msg.textContent='Şifre güncellendi';
+  });
+
+  $('#s-footer-save').addEventListener('click', async () => {
+    const msg = $('#s-footer-msg');
+    await saveSetting('footer_copyright_text', $('#s-footer').value.trim(), msg);
+    await saveSetting('footer_created_visible', $('#s-footer-created').checked?'1':'0', msg);
+  });
+
+  $('#s-kvkk-save').addEventListener('click', async () => {
+    await saveSetting('kvkk_text', $('#s-kvkk').value.trim(), $('#s-kvkk-msg'));
+  });
+}
 
   main.innerHTML = `
     <div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-cog"></i></div> Site Ayarları</div></div>
