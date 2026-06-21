@@ -149,7 +149,11 @@ function renderRoute(fullPath) {
   const segs = path.split('/').filter(Boolean);
 
   if (path === '/') return renderHome(app);
-  if (path === '/forum') return renderForumList(app);  // location.search ile query param okunuyor
+  if (path === '/forum') {
+    // query string'i de geçir
+    const qs = queryStr ? '?' + queryStr : '';
+    return renderForumList(app, qs);
+  }
   if (path.startsWith('/forum/')) {
     const slug = segs.slice(1).join('/');
     return renderForumDetail(app, slug);
@@ -410,12 +414,13 @@ async function renderHome(app) {
   } catch {}
 }
 
-async function renderForumList(app) {
+async function renderForumList(app, queryString) {
   document.title = 'Konular – Demlik';
   updatePageMeta('Konular – Demlik', 'Toplulukla fikir paylaş, tartış, keşfet.', '');
 
-  // URL'den ?tag= parametresini oku
-  const urlParams = new URLSearchParams(location.search);
+  // URL'den ?tag= parametresini oku — önce argüman, yoksa location.search
+  const qs = queryString !== undefined ? queryString : location.search;
+  const urlParams = new URLSearchParams(qs);
   const activeTag = urlParams.get('tag') || '';
 
   app.innerHTML = `

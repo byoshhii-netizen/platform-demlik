@@ -532,12 +532,16 @@ app.get('/api/forums', async (req, res) => {
     FROM forums f LEFT JOIN users u ON f.user_id=u.id`;
 
   if (tag) {
-    // Sistem etiketi veya custom tag ile filtrele
+    // Sistem etiketi, custom tag veya içerik içindeki #tag ile filtrele — hepsi case-insensitive
     baseQuery += ` WHERE (
       EXISTS (SELECT 1 FROM forum_tags ft INNER JOIN tags t ON t.id=ft.tag_id WHERE ft.forum_id=f.id AND LOWER(t.name)=LOWER($1))
-      OR LOWER(f.custom_tags) LIKE LOWER($2)
+      OR f.custom_tags ILIKE $2
+      OR f.content ILIKE $3
+      OR f.title ILIKE $3
     )`;
-    const { rows } = await query(baseQuery + ' ORDER BY f.created_at DESC', [tag, `%${tag}%`]);
+    const likeTag = `%#${tag}%`;
+    const likeTagPlain = `%${tag}%`;
+    const { rows } = await query(baseQuery + ' ORDER BY f.created_at DESC', [tag, likeTagPlain, likeTag]);
     return res.json(rows);
   }
 
