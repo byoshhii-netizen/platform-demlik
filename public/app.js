@@ -2997,9 +2997,16 @@ function openMiniPlayer(audioUrl, slug, song) {
         </div>
         <span class="gplayer-time" id="gp-dur">0:00</span>
       </div>
+      <div class="gplayer-vol-wrap">
+        <button class="gplayer-vol-btn" id="gp-vol-btn" title="Ses"><i class="fas fa-volume-up"></i></button>
+        <input type="range" class="gplayer-vol-slider" id="gp-vol" min="0" max="100" value="80" step="1" title="Ses seviyesi" />
+      </div>
       <button class="gplayer-close" id="gp-close"><i class="fas fa-times"></i></button>
     </div>`;
   player.style.display = 'block';
+  // localStorage'dan ses seviyesini oku
+  const savedVol = parseFloat(localStorage.getItem('demlik_volume') ?? '0.8');
+  audio.volume = savedVol;
 
   function fmtTime(s) { const m=Math.floor(s/60); return m+':'+(Math.floor(s%60)+'').padStart(2,'0'); }
 
@@ -3023,6 +3030,37 @@ function openMiniPlayer(audioUrl, slug, song) {
     audio.pause(); currentAudio=null; player.style.display='none';
   });
 
+  // Ses kontrolü
+  const volSlider = document.getElementById('gp-vol');
+  const volBtn = document.getElementById('gp-vol-btn');
+  if (volSlider) {
+    volSlider.value = Math.round(savedVol * 100);
+    const updateVolIcon = (v) => {
+      if (!volBtn) return;
+      volBtn.innerHTML = v === 0 ? '<i class="fas fa-volume-mute"></i>' : v < 50 ? '<i class="fas fa-volume-down"></i>' : '<i class="fas fa-volume-up"></i>';
+    };
+    updateVolIcon(Math.round(savedVol * 100));
+    volSlider.addEventListener('input', e => {
+      const v = parseInt(e.target.value);
+      audio.volume = v / 100;
+      localStorage.setItem('demlik_volume', v / 100);
+      updateVolIcon(v);
+    });
+  }
+  if (volBtn) {
+    volBtn.addEventListener('click', () => {
+      if (audio.volume > 0) {
+        audio.volume = 0; if(volSlider) volSlider.value = 0;
+        localStorage.setItem('demlik_volume', '0');
+        volBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+      } else {
+        audio.volume = 0.8; if(volSlider) volSlider.value = 80;
+        localStorage.setItem('demlik_volume', '0.8');
+        volBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+      }
+    });
+  }
+
   // Sync play button on detail page
   const detailPlay = document.getElementById('detail-play-btn');
   if (detailPlay) detailPlay.innerHTML = '<i class="fas fa-pause"></i> Durdur';
@@ -3039,6 +3077,7 @@ async function renderMusicDetail(app, slug) {
   document.title = `${song.title} – ${song.artist_name} | Demlik`;
   const isOwn = song.song_type === 'own';
   const hasLyrics = !!song.lyrics?.trim();
+  const isUploader = currentUser && currentUser.id === song.uploader_id;
 
   app.innerHTML = `<div class="container page">
     <div class="music-detail-header">
@@ -3059,8 +3098,15 @@ async function renderMusicDetail(app, slug) {
         </div>
         <div class="music-player-box" id="music-player-box">
           <audio id="detail-audio" src="${escHtml(song.audio_url)}" preload="metadata"></audio>
-          <div class="music-player-controls">
+          <div class="music-player-controls" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <button class="music-play-btn" id="detail-play-btn"><i class="fas fa-play"></i> Oynat</button>
+            <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary)">
+              <button id="detail-vol-btn" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:14px;padding:2px" title="Ses"><i class="fas fa-volume-up"></i></button>
+              <input type="range" id="detail-vol" min="0" max="100" value="80" step="1"
+                style="-webkit-appearance:none;appearance:none;width:80px;height:4px;border-radius:4px;background:var(--border);outline:none;cursor:pointer"
+                title="Ses seviyesi" />
+            </div>
+            ${isUploader ? `<button class="btn btn-outline btn-sm" id="song-edit-btn" style="margin-left:auto"><i class="fas fa-edit"></i> Düzenle</button>` : ''}
           </div>
           <div class="music-progress-wrap">
             <span class="music-time" id="dp-cur">0:00</span>
@@ -3115,9 +3161,88 @@ async function renderMusicDetail(app, slug) {
     }
   });
   seek?.addEventListener('input', e => { if(audio.duration) audio.currentTime=(parseFloat(e.target.value)/100)*audio.duration; });
-}
 
-// ===== ARTİST BAŞVURUSU =====
+  // Detail page ses kontrolü (localStorage'dan başlat)
+  const savedVol = parseFloat(localStorage.getItem('demlik_volume') ?? '0.8');
+  audio.volume = savedVol;
+  const detailVolSlider = document.getElementById('detail-vol');
+  const detailVolBtn = document.getElementById('detail-vol-btn');
+  if (detailVolSlider) {
+    detailVolSlider.value = Math.round(savedVol * 100);
+    const updateVolIcon = (v) => {
+      if (!detailVolBtn) return;
+      detailVolBtn.innerHTML = v === 0 ? '<i class="fas fa-volume-mute"></i>' : v < 50 ? '<i class="fas fa-volume-down"></i>' : '<i class="fas fa-volume-up"></i>';
+    };
+    updateVolIcon(Math.round(savedVol * 100));
+    detailVolSlider.addEventListener('input', e => {
+      const v = parseInt(e.target.value);
+      audio.volume = v / 100;
+      localStorage.setItem('demlik_volume', v / 100);
+      updateVolIcon(v);
+    });
+    detailVolBtn?.addEventListener('click', () => {
+      if (audio.volume > 0) {
+        audio.volume = 0; detailVolSlider.value = 0;
+        localStorage.setItem('demlik_volume', '0');
+        if (detailVolBtn) detailVolBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
+      } else {
+        audio.volume = 0.8; detailVolSlider.value = 80;
+        localStorage.setItem('demlik_volume', '0.8');
+        if (detailVolBtn) detailVolBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+      }
+    });
+  }
+
+  // Şarkı düzenleme butonu (sadece yükleyene gösterilir)
+  const editBtn = document.getElementById('song-edit-btn');
+  if (editBtn) {
+    editBtn.addEventListener('click', () => {
+      showModal(`✏️ Şarkıyı Düzenle — ${escHtml(song.title)}`, `
+        <div class="form-group"><label>Şarkı Adı</label><input id="ue-title" value="${escHtml(song.title)}" /></div>
+        ${song.song_type === 'own' ? `
+        <div class="form-row">
+          <div class="form-group"><label>Sanatçı Adı</label><input id="ue-artist" value="${escHtml(song.artist_name)}" /></div>
+          <div class="form-group"><label>Dağıtıcı</label><input id="ue-dist" value="${escHtml(song.distributor||'')}" /></div>
+        </div>` : `
+        <div class="form-group"><label>Sanatçı Adı</label><input id="ue-artist" value="${escHtml(song.artist_name)}" /></div>`}
+        <div class="form-group"><label>Müzik Türü</label><input id="ue-genre" value="${escHtml(song.genre||'')}" /></div>
+        <div class="form-group"><label>Şarkı Sözleri</label><textarea id="ue-lyrics" rows="5">${escHtml(song.lyrics||'')}</textarea></div>
+        ${song.song_type === 'other' ? `<div class="form-group"><label>Paylaşma Sebebi</label><textarea id="ue-reason" rows="2">${escHtml(song.share_reason||'')}</textarea></div>` : ''}
+        <div class="form-group"><label>Yeni Kapak Fotoğrafı <span style="font-size:11px;color:var(--text-muted)">(boş bırak = değişmez)</span></label>
+          <input type="file" id="ue-cover" accept="image/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:8px;cursor:pointer;border-radius:8px" />
+        </div>
+        <div class="form-group"><label>Yeni Ses Dosyası <span style="font-size:11px;color:var(--text-muted)">(boş bırak = değişmez)</span></label>
+          <input type="file" id="ue-audio" accept="audio/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:8px;cursor:pointer;border-radius:8px" />
+        </div>
+        <button class="btn btn-primary" id="ue-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
+        <div id="ue-msg" style="margin-top:8px;font-size:12px;color:var(--accent-red2);text-align:center"></div>
+      `);
+      document.getElementById('ue-save').addEventListener('click', async () => {
+        const btn = document.getElementById('ue-save');
+        const msg = document.getElementById('ue-msg');
+        btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div>';
+        const fd = new FormData();
+        fd.append('title', document.getElementById('ue-title').value.trim());
+        fd.append('artist_name', document.getElementById('ue-artist').value.trim());
+        fd.append('genre', document.getElementById('ue-genre')?.value.trim() || '');
+        fd.append('lyrics', document.getElementById('ue-lyrics')?.value.trim() || '');
+        const dist = document.getElementById('ue-dist'); if (dist) fd.append('distributor', dist.value.trim());
+        const reason = document.getElementById('ue-reason'); if (reason) fd.append('share_reason', reason.value.trim());
+        const coverFile = document.getElementById('ue-cover')?.files[0]; if (coverFile) fd.append('cover', coverFile);
+        const audioFile = document.getElementById('ue-audio')?.files[0]; if (audioFile) fd.append('audio', audioFile);
+        try {
+          await apiForm('/songs/' + song.id, fd, 'PUT');
+          hideModal();
+          toast('Şarkı güncellendi!');
+          navigate('/muzik/' + slug);
+        } catch(e) {
+          msg.textContent = e.message;
+          btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Kaydet';
+        }
+      });
+    });
+  }
+}
 async function renderArtistApply(app) {
   if (!currentUser) { navigate('/giris'); return; }
   document.title = 'Artist Başvurusu – Demlik';

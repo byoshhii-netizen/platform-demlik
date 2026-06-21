@@ -1381,6 +1381,30 @@ app.get('/api/admin/songs', adminMiddleware, async (req, res) => {
   res.json(rows);
 });
 
+// Kullanıcı: kendi şarkısını güncelle
+app.put('/api/songs/:id', authMiddleware, upload.fields([
+  { name: 'audio', maxCount: 1 },
+  { name: 'cover', maxCount: 1 }
+]), async (req, res) => {
+  const { rows } = await query('SELECT * FROM songs WHERE id=$1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'Şarkı bulunamadı' });
+  const song = rows[0];
+  if (song.uploader_id !== req.user.id) return res.status(403).json({ error: 'Bu şarkıyı düzenleme yetkiniz yok' });
+  const { title, artist_name, genre, lyrics, share_reason, distributor } = req.body;
+  let audio_url = song.audio_url, cover_url = song.cover_url;
+  if (req.files?.audio?.[0]) { try { audio_url = await handleUpload(req.files.audio[0]); } catch {} }
+  if (req.files?.cover?.[0]) { try { cover_url = await handleUpload(req.files.cover[0]); } catch {} }
+  await query(
+    `UPDATE songs SET title=$1, artist_name=$2, genre=$3, lyrics=$4, share_reason=$5,
+     distributor=$6, audio_url=$7, cover_url=$8 WHERE id=$9`,
+    [title || song.title, artist_name || song.artist_name, genre ?? song.genre,
+     lyrics ?? song.lyrics, share_reason ?? song.share_reason,
+     distributor ?? song.distributor, audio_url, cover_url, song.id]
+  );
+  await logAction(req.user.username, 'edit_song', song.slug);
+  res.json({ ok: true, slug: song.slug });
+});
+
 // Admin: şarkı güncelle
 app.put('/api/admin/songs/:id', adminMiddleware, upload.fields([
   { name: 'audio', maxCount: 1 },
@@ -1552,6 +1576,8 @@ app.post('/api/admin/permissions/:userId', adminMiddleware, async (req, res) => 
     can_manage_levels, can_manage_tags, can_manage_announcements,
     can_view_logs, can_manage_settings, can_manage_admins, can_view_users
   } = req.body;
+  // Kullanıcıyı admin yap (is_admin=1 yoksa set et)
+  await query('UPDATE users SET is_admin=1 WHERE id=$1', [uid]);
   const { rows: existing } = await query('SELECT id FROM admin_permissions WHERE user_id=$1', [uid]);
   if (existing.length) {
     await query(`UPDATE admin_permissions SET
@@ -1571,6 +1597,7 @@ app.post('/api/admin/permissions/:userId', adminMiddleware, async (req, res) => 
        can_manage_levels?1:0, can_manage_tags?1:0, can_manage_announcements?1:0,
        can_view_logs?1:0, can_manage_settings?1:0, can_manage_admins?1:0, can_view_users?1:0]);
   }
+  await logAction('admin', 'set_permissions', uid);
   res.json({ ok: true });
 });
 

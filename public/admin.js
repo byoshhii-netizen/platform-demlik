@@ -334,6 +334,7 @@ async function showPermModal(user) {
   let perms = null;
   try { perms = await adminApi('/permissions/' + user.id); } catch {}
   const p = perms || {};
+  const isSuperAdmin = !perms && user.is_admin;
   const permDefs = [
     { key:'can_view_users', label:'Üyeleri Görüntüle', desc:'Üye listesini görebilir', icon:'fas fa-users' },
     { key:'can_ban_users', label:'Üye Yasakla/Kaldır', desc:'Ban atabilir, kaldırabilir', icon:'fas fa-ban' },
@@ -347,14 +348,21 @@ async function showPermModal(user) {
     { key:'can_manage_admins', label:'Admin Yönet', desc:'Admin atayabilir/alabilir', icon:'fas fa-shield-alt' },
   ];
   showModal(`Yetki Düzenleme — ${user.username}`, `
+    ${isSuperAdmin ? `
+    <div style="margin-bottom:16px;padding:12px 14px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:10px;font-size:12px;color:#facc15">
+      <i class="fas fa-crown" style="margin-right:6px"></i>
+      <strong>Bu kullanıcı şu an SÜPERADMİN.</strong> Yetki kaydı yokken tüm yetkilere sahiptir.
+      Aşağıdan kısıtlı yetki kaydı oluşturabilirsin — bu durumda sadece seçtiğin yetkiler geçerli olur.
+    </div>` : `
     <div style="margin-bottom:16px;padding:10px 14px;background:rgba(88,101,242,0.1);border:1px solid rgba(88,101,242,0.2);border-radius:10px;font-size:12px">
       <i class="fas fa-info-circle" style="color:#7c87f5;margin-right:6px"></i>
-      Admin onaylandıysa bu yetki detayları uygulanır. Süper admin tüm yetkilere sahiptir.
-    </div>
+      Kaydet'e basınca kullanıcıya <strong>is_admin=1</strong> atanır ve sadece işaretli yetkiler verilir.
+      Tüm yetkiler verirsen süperadmin gibi çalışır.
+    </div>`}
     <div class="perm-grid" id="perm-grid">
       ${permDefs.map(d => `
         <div class="perm-item">
-          <input type="checkbox" id="perm-${d.key}" ${p[d.key] ? 'checked' : ''} />
+          <input type="checkbox" id="perm-${d.key}" ${(isSuperAdmin || p[d.key]) ? 'checked' : ''} />
           <div>
             <span class="perm-label"><i class="${d.icon}" style="margin-right:5px;color:var(--red2)"></i>${d.label}</span>
             <span class="perm-desc">${d.desc}</span>
@@ -365,7 +373,7 @@ async function showPermModal(user) {
       <button class="btn btn-primary" id="perm-all-btn" style="flex:1;justify-content:center"><i class="fas fa-check-double"></i> Tümünü Ver</button>
       <button class="btn btn-outline" id="perm-none-btn" style="flex:1;justify-content:center"><i class="fas fa-times"></i> Tümünü Al</button>
     </div>
-    <button class="btn btn-blue" id="perm-save-btn" style="width:100%;justify-content:center;margin-top:8px"><i class="fas fa-save"></i> Kaydet</button>
+    <button class="btn btn-blue" id="perm-save-btn" style="width:100%;justify-content:center;margin-top:8px"><i class="fas fa-save"></i> Kaydet &amp; Adminliği Etkinleştir</button>
     <div id="perm-error" class="form-error mt-4"></div>
   `);
   $('#perm-all-btn').addEventListener('click', () => permDefs.forEach(d => { const el=$('#perm-'+d.key); if(el) el.checked=true; }));
