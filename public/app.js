@@ -1682,7 +1682,11 @@ async function renderProfile(app, username) {
         ${levelBadge}
         ${progressHTML}
         ${user.bio ? `<div class="profile-bio" style="margin-top:10px">${escHtml(user.bio)}</div>` : ''}
-        ${links.length ? `<div class="profile-links">${links.map(l => `<a href="${escHtml(l.url)}" target="_blank" class="profile-link"><i class="fas fa-link"></i> ${escHtml(l.label || l.url)}</a>`).join('')}</div>` : ''}
+        ${links.length ? `<div class="profile-links">${links.map(l => {
+          let url = (l.url||'').trim();
+          if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+          return `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="profile-link"><i class="fas fa-link"></i> ${escHtml(l.label || l.url)}</a>`;
+        }).join('')}</div>` : ''}
         <div class="profile-stats" style="margin-top:12px">
           <div class="profile-stat"><div class="profile-stat-num">${user.forum_count}</div><div class="profile-stat-label">Forum</div></div>
           <div class="profile-stat"><div class="profile-stat-num">${user.book_count}</div><div class="profile-stat-label">Kitap</div></div>
