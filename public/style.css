@@ -57,11 +57,13 @@ img { max-width: 100%; height: auto; display: block; object-fit: contain; }
 .comment, .comment-body,
 .chat-msg, .chat-msg-body, .chat-msg-text,
 .forum-detail, .forum-detail-content,
-.profile-header, .profile-info {
+.profile-header, .profile-info,
+.ebook-reader, .ebook-page-content, .book-text, .book-title-heading {
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+.ebook-reader, .ebook-page-content { box-sizing: border-box; }
 
 /* Flex ve grid taşma */
 .flex, [style*="display:flex"], [style*="display: flex"] {
@@ -570,6 +572,9 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   border-radius: 16px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .ebook-toolbar {
   background: #111;
@@ -581,9 +586,11 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   position: sticky;
   top: 60px;
   z-index: 10;
+  min-width: 0;
+  overflow: hidden;
 }
 .ebook-page-content {
-  padding: 48px 52px;
+  padding: 40px 44px;
   font-size: 17px;
   line-height: 1.9;
   color: #e8ddd0;
@@ -592,6 +599,8 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   word-break: break-word;
   overflow-wrap: anywhere;
   max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
   overflow-x: hidden;
 }
 .ebook-page-content .book-title-heading {
