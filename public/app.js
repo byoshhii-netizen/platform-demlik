@@ -102,8 +102,7 @@ function userDisplayName(u) {
   if (!u) return 'Silindi';
   const color = (u.show_level_color !== 0 && u.name_color) ? `style="color:${escHtml(u.name_color)}"` : '';
   const adminBadge = u.is_admin ? ` <i class="fas fa-shield-alt user-admin" title="Demlik Yetkilisi" data-admin-since="${escHtml(u.admin_since || '')}" style="color:#5865F2;cursor:pointer;font-size:13px"></i>` : '';
-  const titleBadge = u.title ? ` <span style="font-size:11px;color:var(--text-muted);font-weight:400"> · ${escHtml(u.title)}</span>` : '';
-  return `<span class="user-badge" ${color}>${escHtml(u.username)}${u.is_vip ? ' <i class="fas fa-gem user-vip" title="VIP"></i>' : ''}${u.is_plus ? ' <i class="fas fa-plus user-plus" title="Plus"></i>' : ''}${adminBadge}${titleBadge}</span>`;
+  return `<span class="user-badge" ${color}>${escHtml(u.username)}${u.is_vip ? ' <i class="fas fa-gem user-vip" title="VIP"></i>' : ''}${u.is_plus ? ' <i class="fas fa-plus user-plus" title="Plus"></i>' : ''}${adminBadge}</span>`;
 }
 
 function avatarImg(u, cls = 'avatar-sm') {
@@ -1670,16 +1669,34 @@ async function renderProfile(app, username) {
   const links = (() => { try { return JSON.parse(user.links || '[]'); } catch { return []; } })();
   const isOwn = currentUser && currentUser.id === user.id;
 
+  // Rozet satırı
+  const badgeItems = [];
+  if (level && user.show_level_badge) {
+    badgeItems.push(`<span class="profile-badge" style="color:${escHtml(levelColor)};border-color:${escHtml(levelColor)};background:${escHtml(levelColor)}20" title="Seviye: ${escHtml(level.name)}"><i class="${escHtml(level.icon)}"></i> ${escHtml(level.name)} <span style="font-size:10px;opacity:0.7">seviye</span></span>`);
+  }
+  if (user.is_artist) {
+    badgeItems.push(`<span class="profile-badge" style="color:#a855f7;border-color:#a855f733;background:#a855f715" title="Artist"><i class="fas fa-microphone-alt"></i> Artist</span>`);
+  }
+  if (user.is_vip) {
+    badgeItems.push(`<span class="profile-badge" style="color:#fbbf24;border-color:#fbbf2433;background:#fbbf2415" title="VIP"><i class="fas fa-gem"></i> VIP</span>`);
+  }
+  if (user.is_plus) {
+    badgeItems.push(`<span class="profile-badge" style="color:#818cf8;border-color:#818cf833;background:#818cf815" title="Plus"><i class="fas fa-plus-circle"></i> Plus</span>`);
+  }
+  const badgesHTML = badgeItems.length ? `<div class="profile-badges-row">${badgeItems.join('')}</div>` : '';
+
   app.innerHTML = `<div class="container page">
     <div class="profile-header">
       <div class="profile-avatar-wrap">
         ${user.avatar ? `<img src="${escHtml(user.avatar)}" class="profile-avatar" alt="" />` : `<div class="profile-avatar-placeholder"><i class="fas fa-user"></i></div>`}
       </div>
       <div class="profile-info">
-        <div class="profile-username" style="${user.show_level_color && user.name_color ? 'color:' + escHtml(user.name_color) : ''}">${escHtml(user.username)} ${user.is_vip ? '<i class="fas fa-gem" style="color:#fbbf24;font-size:18px" title="VIP"></i>' : ''} ${user.is_plus ? '<i class="fas fa-plus-circle" style="color:#818cf8;font-size:18px" title="Plus"></i>' : ''}${user.is_admin ? ` <i class="fas fa-shield-alt user-admin" title="Demlik Yetkilisi" data-admin-since="${escHtml(user.admin_since || '')}" style="color:#5865F2;cursor:pointer;font-size:16px"></i>` : ''}${level ? ` <i class="${escHtml(level.icon)}" style="color:${escHtml(level.color)};font-size:16px" title="${escHtml(level.name)}"></i> <span style="font-size:13px;font-weight:500;color:${escHtml(level.color)}">${escHtml(level.name)}</span>` : ''}</div>
-        ${user.title ? `<div style="font-size:13px;font-weight:600;color:var(--accent-red2);margin-top:4px"><i class="fas fa-briefcase" style="font-size:11px;margin-right:4px"></i>${escHtml(user.title)}</div>` : ''}
-        ${user.location ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px"><i class="fas fa-map-marker-alt" style="font-size:11px;margin-right:4px"></i>${escHtml(user.location)}</div>` : ''}
-        ${levelBadge}
+        <div class="profile-username" style="${user.show_level_color && user.name_color ? 'color:' + escHtml(user.name_color) : ''}">
+          ${escHtml(user.username)}${user.is_admin ? ` <i class="fas fa-shield-alt user-admin" title="Demlik Yetkilisi" data-admin-since="${escHtml(user.admin_since || '')}" style="color:#5865F2;cursor:pointer;font-size:18px"></i>` : ''}
+        </div>
+        ${user.title ? `<div class="profile-title"><i class="fas fa-briefcase" style="font-size:11px;margin-right:4px"></i>${escHtml(user.title)}</div>` : ''}
+        ${user.location ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px"><i class="fas fa-map-marker-alt" style="font-size:11px;margin-right:4px"></i>${escHtml(user.location)}</div>` : ''}
+        ${badgesHTML}
         ${progressHTML}
         ${user.bio ? `<div class="profile-bio" style="margin-top:10px">${escHtml(user.bio)}</div>` : ''}
         ${links.length ? `<div class="profile-links">${links.map(l => {
