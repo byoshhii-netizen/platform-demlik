@@ -3858,4 +3858,3 @@ async function renderShareSong(app) {
     }
   });
 }
-

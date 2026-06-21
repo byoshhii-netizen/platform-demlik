@@ -1522,4 +1522,3 @@ async function renderSettings(main) {
     await saveSetting('music_other_rules', document.getElementById('s-music-other').value.trim(), document.getElementById('s-music-msg'));
   });
 }
-
