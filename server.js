@@ -1329,6 +1329,8 @@ app.post('/api/songs', authMiddleware, upload.fields([
 
 // Tüm şarkılar (liste)
 app.get('/api/songs', async (req, res) => {
+  // Süresi dolan banları otomatik aktife al
+  await query(`UPDATE songs SET status='active', ban_reason='', ban_until=NULL WHERE status='suspended' AND ban_until IS NOT NULL AND ban_until < NOW()`);
   const { q, genre, artist, distributor } = req.query;
   let where = "WHERE s.status='active'";
   const params = [];
@@ -1424,6 +1426,93 @@ app.post('/api/admin/artist-applications/:id/review', adminMiddleware, async (re
   }
   res.json({ ok: true });
 });
+
+// ===== ADMIN: ARTİSTLER =====
+
+// Tüm artistler listesi
+app.get('/api/admin/artists', adminMiddleware, async (req, res) => {
+  const { rows } = await query(`
+    SELECT u.id, u.username, u.email, u.avatar, u.is_artist, u.artist_since,
+           u.artist_display_name, u.artist_bio, u.artist_genre, u.artist_website,
+           u.banned,
+           COUNT(s.id) AS song_count,
+           SUM(s.play_count) AS total_plays
+    FROM users u
+    LEFT JOIN songs s ON s.uploader_id = u.id AND s.status != 'deleted'
+    WHERE u.is_artist = 1
+    GROUP BY u.id
+    ORDER BY u.artist_since DESC
+  `);
+  res.json(rows);
+});
+
+// Artist bilgilerini düzenle
+app.put('/api/admin/artists/:id', adminMiddleware, async (req, res) => {
+  const { artist_display_name, artist_bio, artist_genre, artist_website, is_artist } = req.body;
+  const { rows } = await query('SELECT id FROM users WHERE id=$1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  await query(`
+    UPDATE users SET
+      artist_display_name = COALESCE($1, artist_display_name),
+      artist_bio          = COALESCE($2, artist_bio),
+      artist_genre        = COALESCE($3, artist_genre),
+      artist_website      = COALESCE($4, artist_website),
+      is_artist           = $5
+    WHERE id = $6
+  `, [
+    artist_display_name ?? null,
+    artist_bio ?? null,
+    artist_genre ?? null,
+    artist_website ?? null,
+    is_artist !== undefined ? (is_artist ? 1 : 0) : 1,
+    req.params.id
+  ]);
+  await logAction('admin', 'edit_artist', req.params.id);
+  res.json({ ok: true });
+});
+
+// Artist'in şarkıları
+app.get('/api/admin/artists/:id/songs', adminMiddleware, async (req, res) => {
+  const { rows } = await query(`
+    SELECT s.id, s.title, s.artist_name, s.genre, s.cover_url, s.audio_url,
+           s.play_count, s.slug, s.status, s.song_type, s.distributor,
+           s.ban_reason, s.ban_until, s.created_at
+    FROM songs s
+    WHERE s.uploader_id = $1
+    ORDER BY s.created_at DESC
+  `, [req.params.id]);
+  res.json(rows);
+});
+
+// Şarkıya ban uygula (süreli veya kalıcı)
+app.post('/api/admin/songs/:id/ban', adminMiddleware, async (req, res) => {
+  const { reason, duration_days } = req.body;
+  // duration_days: sayı ise süreli, 0 veya yoksa kalıcı (null)
+  const banUntil = duration_days && parseInt(duration_days) > 0
+    ? new Date(Date.now() + parseInt(duration_days) * 86400000).toISOString()
+    : null;
+  const { rows } = await query('SELECT id, slug FROM songs WHERE id=$1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'Şarkı bulunamadı' });
+  await query(
+    'UPDATE songs SET status=$1, ban_reason=$2, ban_until=$3 WHERE id=$4',
+    ['suspended', reason || '', banUntil, req.params.id]
+  );
+  await logAction('admin', 'ban_song', rows[0].slug + (banUntil ? ` (${duration_days}g)` : ' (kalıcı)'));
+  res.json({ ok: true, ban_until: banUntil });
+});
+
+// Şarkı banını kaldır
+app.post('/api/admin/songs/:id/unban', adminMiddleware, async (req, res) => {
+  const { rows } = await query('SELECT id, slug FROM songs WHERE id=$1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'Şarkı bulunamadı' });
+  await query(
+    'UPDATE songs SET status=$1, ban_reason=$2, ban_until=$3 WHERE id=$4',
+    ['active', '', null, req.params.id]
+  );
+  await logAction('admin', 'unban_song', rows[0].slug);
+  res.json({ ok: true });
+});
+
 
 // Şarkı yükleme kuralları
 app.get('/api/music-rules', async (req, res) => {

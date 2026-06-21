@@ -114,7 +114,7 @@ function loadSection(section) {
   main.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
   const map = {
     dashboard: renderDashboard, users: renderUsers,
-    forums: renderForums, books: renderBooks, groups: renderGroups,
+    forums: renderForums, books: renderBooks, groups: renderGroups, artists: renderArtists,
     levels: renderLevels, tags: renderTags, logs: renderLogs,
     settings: renderSettings, messages: renderAdminMessages,
     announcements: renderAnnouncements,
@@ -510,6 +510,307 @@ async function renderGroups(main) {
   $('#group-search').addEventListener('input', e => {
     const q = e.target.value.toLowerCase();
     renderTable(groups.filter(g => g.name.toLowerCase().includes(q) || (g.owner_name||'').toLowerCase().includes(q)));
+  });
+}
+
+// ===== ARTISTS =====
+async function renderArtists(main) {
+  let artists = [];
+  try { artists = await adminApi('/artists'); } catch (e) {
+    main.innerHTML = `<div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-microphone-alt"></i></div> Artistler</div></div><div class="card"><div class="card-body" style="color:var(--red2);padding:20px"><i class="fas fa-exclamation-circle"></i> ${escHtml(e.message)}</div></div>`;
+    return;
+  }
+
+  const renderTable = (list) => {
+    const tbody = $('#artists-tbody'); if (!tbody) return;
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:32px"><i class="fas fa-microphone-slash" style="font-size:28px;margin-bottom:8px;display:block"></i>Artist bulunamadı</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = list.map(a => `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${a.avatar ? `<img src="${escHtml(a.avatar)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--border-red)" />`
+            : `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--red),#7f1d1d);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px"><i class="fas fa-microphone-alt"></i></div>`}
+          <div>
+            <div style="font-weight:600;font-size:13px">${escHtml(a.username)}</div>
+            ${a.artist_display_name ? `<div style="font-size:11px;color:var(--text3)">${escHtml(a.artist_display_name)}</div>` : ''}
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;color:var(--text2)">${escHtml(a.artist_genre||'—')}</td>
+      <td>
+        <div style="font-size:13px;font-weight:600;color:var(--purple)">${a.song_count||0}</div>
+        <div style="font-size:10px;color:var(--text3)">${Number(a.total_plays||0).toLocaleString('tr-TR')} dinlenme</div>
+      </td>
+      <td style="font-size:11px;color:var(--text3)">${a.artist_since ? formatDate(a.artist_since) : '—'}</td>
+      <td>${a.banned ? '<span class="badge badge-red"><i class="fas fa-ban"></i> Banlı</span>' : '<span class="badge badge-green"><i class="fas fa-check"></i> Aktif</span>'}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-blue btn-xs view-artist-songs-btn" data-id="${a.id}" data-name="${escHtml(a.username)}" title="Şarkılarını Gör"><i class="fas fa-music"></i> Şarkılar</button>
+          <button class="btn btn-outline btn-xs edit-artist-btn" data-id="${a.id}" title="Bilgileri Düzenle"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-danger btn-xs revoke-artist-btn" data-id="${a.id}" data-name="${escHtml(a.username)}" title="Artist Rozetini Kaldır"><i class="fas fa-microphone-slash"></i></button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+    tbody.querySelectorAll('.view-artist-songs-btn').forEach(btn => {
+      btn.addEventListener('click', () => showArtistSongsModal(btn.dataset.id, btn.dataset.name));
+    });
+    tbody.querySelectorAll('.edit-artist-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const a = artists.find(x => x.id == btn.dataset.id);
+        if (a) showEditArtistModal(a, artists, renderTable);
+      });
+    });
+    tbody.querySelectorAll('.revoke-artist-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`${btn.dataset.name} kullanıcısının artist rozeti kaldırılsın mı?`)) return;
+        try {
+          await adminApi('/artists/'+btn.dataset.id, { method:'PUT', body:JSON.stringify({ is_artist: 0 }) });
+          toast('Artist rozeti kaldırıldı');
+          artists = artists.filter(a => a.id != btn.dataset.id);
+          renderTable(artists);
+        } catch(e) { toast(e.message, 'error'); }
+      });
+    });
+  };
+
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title">
+        <div class="icon-pill"><i class="fas fa-microphone-alt"></i></div>
+        Artistler
+        <span style="font-size:13px;font-weight:400;color:var(--text2)">(${artists.length})</span>
+      </div>
+      <div class="adm-search"><i class="fas fa-search"></i><input type="text" id="artist-search" placeholder="Artist veya kullanıcı ara..." style="min-width:240px" /></div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Artist</th><th>Tür</th><th>Şarkılar</th><th>Artist'ten beri</th><th>Durum</th><th>İşlem</th></tr></thead>
+          <tbody id="artists-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+
+  renderTable(artists);
+  $('#artist-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderTable(artists.filter(a =>
+      a.username.toLowerCase().includes(q) ||
+      (a.artist_display_name||'').toLowerCase().includes(q) ||
+      (a.artist_genre||'').toLowerCase().includes(q)
+    ));
+  });
+}
+
+async function showArtistSongsModal(artistId, artistName) {
+  showModal(`🎵 ${artistName} — Şarkılar`, `<div class="loading-center" style="padding:40px"><div class="spinner"></div></div>`);
+  let songs = [];
+  try { songs = await adminApi('/artists/'+artistId+'/songs'); } catch(e) {
+    $('#modal-body').innerHTML = `<div style="color:var(--red2);padding:20px">${escHtml(e.message)}</div>`; return;
+  }
+
+  const renderSongs = (list) => {
+    const wrap = $('#artist-songs-wrap'); if (!wrap) return;
+    if (!list.length) {
+      wrap.innerHTML = '<div style="text-align:center;color:var(--text3);padding:32px"><i class="fas fa-music" style="font-size:28px;margin-bottom:8px;display:block"></i>Şarkı yok</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(s => {
+      const isBanned = s.status === 'suspended';
+      const banExpired = s.ban_until && new Date(s.ban_until) < new Date();
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        ${s.cover_url
+          ? `<img src="${escHtml(s.cover_url)}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0" />`
+          : `<div style="width:44px;height:44px;border-radius:8px;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--text3)"><i class="fas fa-music"></i></div>`}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(s.title)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">
+            ${escHtml(s.artist_name)}${s.genre ? ` · ${escHtml(s.genre)}` : ''} · ${s.play_count} dinlenme
+          </div>
+          ${isBanned ? `<div style="font-size:10px;color:var(--red2);margin-top:2px">
+            <i class="fas fa-ban"></i> ${escHtml(s.ban_reason||'Ban')}
+            ${s.ban_until && !banExpired
+              ? ` · <span style="color:var(--orange)">${new Date(s.ban_until).toLocaleDateString('tr-TR')} tarihine kadar</span>`
+              : s.ban_until ? ' <span style="color:var(--text3)">(süresi doldu)</span>' : ' <span style="color:var(--text3)">(kalıcı)</span>'}
+          </div>` : ''}
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+          ${isBanned && !banExpired
+            ? `<button class="btn btn-green btn-xs song-unban-btn" data-id="${s.id}"><i class="fas fa-unlock"></i> Banı Kaldır</button>`
+            : `<button class="btn btn-danger btn-xs song-ban-btn" data-id="${s.id}" data-title="${escHtml(s.title)}"><i class="fas fa-ban"></i> Ban</button>`}
+          <span style="font-size:10px;color:var(--text3)">${timeAgo(s.created_at)}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.song-ban-btn').forEach(btn => {
+      btn.addEventListener('click', () => showSongBanModal(btn.dataset.id, btn.dataset.title, songs, renderSongs));
+    });
+    wrap.querySelectorAll('.song-unban-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Banı kaldırmak istediğine emin misin?')) return;
+        try {
+          await adminApi('/songs/'+btn.dataset.id+'/unban', { method:'POST' });
+          toast('Ban kaldırıldı');
+          const s = songs.find(x => x.id == btn.dataset.id);
+          if (s) { s.status = 'active'; s.ban_reason = ''; s.ban_until = null; }
+          renderSongs(songs);
+        } catch(e) { toast(e.message, 'error'); }
+      });
+    });
+  };
+
+  $('#modal-body').innerHTML = `
+    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;color:var(--text2)">${songs.length} şarkı</span>
+      <div class="adm-search" style="max-width:200px"><i class="fas fa-search"></i><input id="asong-search" type="text" placeholder="Ara..." style="min-width:0" /></div>
+    </div>
+    <div id="artist-songs-wrap"></div>`;
+  renderSongs(songs);
+
+  $('#asong-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderSongs(songs.filter(s => s.title.toLowerCase().includes(q) || s.artist_name.toLowerCase().includes(q)));
+  });
+}
+
+function showSongBanModal(songId, songTitle, songs, renderSongs) {
+  showModal(`🚫 Şarkı Banla — ${songTitle}`, `
+    <div style="background:rgba(220,38,38,0.07);border:1px solid var(--border-red);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--text2)">
+      <i class="fas fa-info-circle" style="color:var(--red2);margin-right:6px"></i>
+      Ban uygulanan şarkı dinleyicilere gösterilmez. Süreli ban bitince otomatik aktife döner.
+    </div>
+    <div class="form-group">
+      <label>Ban Sebebi</label>
+      <input id="ban-reason" placeholder="Telif ihlali, uygunsuz içerik..." />
+    </div>
+    <div class="form-group">
+      <label>Ban Süresi</label>
+      <select id="ban-duration">
+        <option value="0">Kalıcı (elle kaldırana kadar)</option>
+        <option value="1">1 Gün</option>
+        <option value="3">3 Gün</option>
+        <option value="7">7 Gün</option>
+        <option value="14">14 Gün</option>
+        <option value="30">30 Gün</option>
+        <option value="custom">Özel Gün Sayısı...</option>
+      </select>
+    </div>
+    <div id="custom-days-wrap" class="form-group hidden">
+      <label>Gün Sayısı</label>
+      <input id="custom-days" type="number" min="1" placeholder="Örn: 60" />
+    </div>
+    <div id="ban-preview" style="font-size:12px;margin-bottom:16px;padding:8px 12px;border-radius:8px;background:var(--bg4)"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" id="ban-cancel-btn" style="flex:1;justify-content:center">İptal</button>
+      <button class="btn btn-primary" id="ban-confirm-btn" style="flex:1;justify-content:center"><i class="fas fa-ban"></i> Banı Uygula</button>
+    </div>
+    <div id="ban-err" class="form-error mt-4"></div>
+  `);
+
+  const updatePreview = () => {
+    const d = $('#ban-duration').value;
+    const days = d === 'custom' ? parseInt($('#custom-days')?.value)||0 : parseInt(d);
+    const p = $('#ban-preview');
+    if (!p) return;
+    if (!days) {
+      p.innerHTML = '<i class="fas fa-infinity" style="color:var(--red2);margin-right:6px"></i><span style="color:var(--red2)">Kalıcı ban — admin elle kaldırana kadar devam eder</span>';
+    } else {
+      const until = new Date(Date.now() + days * 86400000);
+      p.innerHTML = `<i class="fas fa-clock" style="color:var(--orange);margin-right:6px"></i><span style="color:var(--orange)">Bitiş: ${until.toLocaleDateString('tr-TR', {day:'2-digit',month:'long',year:'numeric'})}</span>`;
+    }
+  };
+  updatePreview();
+
+  $('#ban-duration').addEventListener('change', () => {
+    $('#custom-days-wrap').classList.toggle('hidden', $('#ban-duration').value !== 'custom');
+    updatePreview();
+  });
+  $('#custom-days')?.addEventListener('input', updatePreview);
+  $('#ban-cancel-btn').addEventListener('click', hideModal);
+
+  $('#ban-confirm-btn').addEventListener('click', async () => {
+    const btn = $('#ban-confirm-btn'); const err = $('#ban-err');
+    const reason = $('#ban-reason').value.trim();
+    const d = $('#ban-duration').value;
+    const days = d === 'custom' ? parseInt($('#custom-days')?.value)||0 : parseInt(d);
+    if (!reason) { err.textContent = 'Ban sebebi zorunlu'; return; }
+    btn.disabled = true; btn.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div>';
+    try {
+      await adminApi('/songs/'+songId+'/ban', { method:'POST', body:JSON.stringify({ reason, duration_days: days }) });
+      toast('Şarkıya ban uygulandı');
+      hideModal();
+      const s = songs.find(x => x.id == songId);
+      if (s) { s.status='suspended'; s.ban_reason=reason; s.ban_until=days>0?new Date(Date.now()+days*86400000).toISOString():null; }
+      if (renderSongs) renderSongs(songs);
+    } catch(e) { err.textContent=e.message; btn.disabled=false; btn.innerHTML='<i class="fas fa-ban"></i> Banı Uygula'; }
+  });
+}
+
+function showEditArtistModal(artist, list, renderTable) {
+  showModal(`✏️ Artist Düzenle — ${escHtml(artist.username)}`, `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg4);border-radius:10px;margin-bottom:16px">
+      ${artist.avatar
+        ? `<img src="${escHtml(artist.avatar)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover" />`
+        : `<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--red),#7f1d1d);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px"><i class="fas fa-microphone-alt"></i></div>`}
+      <div>
+        <div style="font-weight:700">${escHtml(artist.username)}</div>
+        <div style="font-size:11px;color:var(--text3)">Artist'ten beri: ${artist.artist_since ? formatDate(artist.artist_since) : '—'}</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Sahne Adı / Display Name</label>
+      <input id="ea-display" value="${escHtml(artist.artist_display_name||'')}" placeholder="Kullanıcı adından farklı sanatçı adı..." />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Müzik Türü</label>
+        <input id="ea-genre" value="${escHtml(artist.artist_genre||'')}" placeholder="Pop, Rock, Hip-Hop..." />
+      </div>
+      <div class="form-group">
+        <label>Website / Sosyal Medya</label>
+        <input id="ea-website" value="${escHtml(artist.artist_website||'')}" placeholder="https://..." />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Artist Bio</label>
+      <textarea id="ea-bio" rows="3" placeholder="Artist hakkında kısa açıklama...">${escHtml(artist.artist_bio||'')}</textarea>
+    </div>
+    <div style="background:rgba(220,38,38,0.07);border:1px solid var(--border-red);border-radius:10px;padding:12px;margin-bottom:16px">
+      <label class="checkbox-label" style="margin:0">
+        <input type="checkbox" id="ea-is-artist" ${artist.is_artist ? 'checked' : ''} />
+        <span><i class="fas fa-microphone-alt" style="color:var(--red2);margin-right:6px"></i> Artist rozeti aktif</span>
+      </label>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;margin-left:26px">Rozeti kaldırırsan kullanıcı yeni şarkı yükleyemez. Mevcut şarkılar silinmez.</div>
+    </div>
+    <button class="btn btn-primary" id="ea-save" style="width:100%;justify-content:center"><i class="fas fa-save"></i> Kaydet</button>
+    <div id="ea-err" class="form-error mt-4"></div>
+  `);
+
+  $('#ea-save').addEventListener('click', async () => {
+    const btn = $('#ea-save'); const err = $('#ea-err');
+    btn.disabled=true; btn.innerHTML='<div class="spinner" style="width:14px;height:14px"></div> Kaydediliyor...';
+    try {
+      const body = {
+        artist_display_name: $('#ea-display').value.trim(),
+        artist_genre: $('#ea-genre').value.trim(),
+        artist_website: $('#ea-website').value.trim(),
+        artist_bio: $('#ea-bio').value.trim(),
+        is_artist: $('#ea-is-artist').checked ? 1 : 0
+      };
+      await adminApi('/artists/'+artist.id, { method:'PUT', body:JSON.stringify(body) });
+      toast('Artist bilgileri güncellendi');
+      const idx = list.findIndex(a => a.id == artist.id);
+      if (idx !== -1) {
+        if (!body.is_artist) { list.splice(idx, 1); }
+        else { list[idx] = { ...list[idx], ...body }; }
+      }
+      hideModal();
+      if (renderTable) renderTable(list);
+    } catch(e) { err.textContent=e.message; btn.disabled=false; btn.innerHTML='<i class="fas fa-save"></i> Kaydet'; }
   });
 }
 
