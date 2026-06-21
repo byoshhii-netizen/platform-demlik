@@ -377,6 +377,351 @@ async function showPermModal(user) {
   });
 }
 
+// ===== FORUMS =====
+async function renderForums(main) {
+  let forums = [];
+  try { forums = await adminApi('/forums'); } catch (e) {
+    main.innerHTML = `<div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-comments"></i></div> Konular</div></div><div class="card"><div class="card-body" style="color:var(--red2);padding:20px"><i class="fas fa-exclamation-circle"></i> ${escHtml(e.message)}</div></div>`;
+    return;
+  }
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-comments"></i></div> Konular <span style="font-size:13px;font-weight:400;color:var(--text2)">(${forums.length})</span></div>
+      <div class="adm-search"><i class="fas fa-search"></i><input type="text" id="forum-search" placeholder="Başlık veya kullanıcı ara..." style="min-width:240px" /></div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Başlık</th><th>Yazar</th><th>Tarih</th><th>İşlem</th></tr></thead>
+          <tbody id="forums-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+  const renderTable = (list) => {
+    const tbody = $('#forums-tbody'); if (!tbody) return;
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:32px">Konu bulunamadı</td></tr>'; return; }
+    tbody.innerHTML = list.map(f => `<tr>
+      <td style="color:var(--text3);font-size:12px">#${f.id}</td>
+      <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.title)}">${escHtml(f.title)}</td>
+      <td><span style="color:var(--blue2)">${escHtml(f.username||'—')}</span></td>
+      <td style="color:var(--text3);font-size:12px">${timeAgo(f.created_at)}</td>
+      <td><button class="btn btn-danger btn-xs del-forum-btn" data-id="${f.id}"><i class="fas fa-trash"></i> Sil</button></td>
+    </tr>`).join('');
+    tbody.querySelectorAll('.del-forum-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Bu konuyu silmek istediğine emin misin?')) return;
+        try { await adminApi('/forum/'+btn.dataset.id, {method:'DELETE'}); toast('Konu silindi'); forums = forums.filter(f=>f.id!=btn.dataset.id); renderTable(forums); }
+        catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  };
+  renderTable(forums);
+  $('#forum-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderTable(forums.filter(f => f.title.toLowerCase().includes(q) || (f.username||'').toLowerCase().includes(q)));
+  });
+}
+
+// ===== BOOKS =====
+async function renderBooks(main) {
+  let books = [];
+  try { books = await adminApi('/books'); } catch (e) {
+    main.innerHTML = `<div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-book"></i></div> Kitaplar</div></div><div class="card"><div class="card-body" style="color:var(--red2);padding:20px"><i class="fas fa-exclamation-circle"></i> ${escHtml(e.message)}</div></div>`;
+    return;
+  }
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-book"></i></div> Kitaplar <span style="font-size:13px;font-weight:400;color:var(--text2)">(${books.length})</span></div>
+      <div class="adm-search"><i class="fas fa-search"></i><input type="text" id="book-search" placeholder="Başlık veya kullanıcı ara..." style="min-width:240px" /></div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Başlık</th><th>Yazar</th><th>Sayfa</th><th>Tarih</th><th>İşlem</th></tr></thead>
+          <tbody id="books-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+  const renderTable = (list) => {
+    const tbody = $('#books-tbody'); if (!tbody) return;
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:32px">Kitap bulunamadı</td></tr>'; return; }
+    tbody.innerHTML = list.map(b => `<tr>
+      <td style="color:var(--text3);font-size:12px">#${b.id}</td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(b.title)}">${escHtml(b.title)}</td>
+      <td><span style="color:var(--blue2)">${escHtml(b.username||'—')}</span></td>
+      <td style="color:var(--text3);font-size:12px">${b.page_count||0}</td>
+      <td style="color:var(--text3);font-size:12px">${timeAgo(b.created_at)}</td>
+      <td><button class="btn btn-danger btn-xs del-book-btn" data-id="${b.id}"><i class="fas fa-trash"></i> Sil</button></td>
+    </tr>`).join('');
+    tbody.querySelectorAll('.del-book-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Bu kitabı silmek istediğine emin misin?')) return;
+        try { await adminApi('/book/'+btn.dataset.id, {method:'DELETE'}); toast('Kitap silindi'); books = books.filter(b=>b.id!=btn.dataset.id); renderTable(books); }
+        catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  };
+  renderTable(books);
+  $('#book-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderTable(books.filter(b => b.title.toLowerCase().includes(q) || (b.username||'').toLowerCase().includes(q)));
+  });
+}
+
+// ===== GROUPS =====
+async function renderGroups(main) {
+  let groups = [];
+  try { groups = await adminApi('/groups'); } catch (e) {
+    main.innerHTML = `<div class="adm-section-header"><div class="adm-section-title"><div class="icon-pill"><i class="fas fa-users-cog"></i></div> Gruplar</div></div><div class="card"><div class="card-body" style="color:var(--red2);padding:20px"><i class="fas fa-exclamation-circle"></i> ${escHtml(e.message)}</div></div>`;
+    return;
+  }
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-users-cog"></i></div> Gruplar <span style="font-size:13px;font-weight:400;color:var(--text2)">(${groups.length})</span></div>
+      <div class="adm-search"><i class="fas fa-search"></i><input type="text" id="group-search" placeholder="Grup adı veya sahibi ara..." style="min-width:240px" /></div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Grup Adı</th><th>Sahibi</th><th>Tarih</th><th>İşlem</th></tr></thead>
+          <tbody id="groups-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+  const renderTable = (list) => {
+    const tbody = $('#groups-tbody'); if (!tbody) return;
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:32px">Grup bulunamadı</td></tr>'; return; }
+    tbody.innerHTML = list.map(g => `<tr>
+      <td style="color:var(--text3);font-size:12px">#${g.id}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(g.name)}">${escHtml(g.name)}</td>
+      <td><span style="color:var(--blue2)">${escHtml(g.owner_name||'—')}</span></td>
+      <td style="color:var(--text3);font-size:12px">${timeAgo(g.created_at)}</td>
+      <td><button class="btn btn-danger btn-xs del-group-btn" data-id="${g.id}"><i class="fas fa-trash"></i> Sil</button></td>
+    </tr>`).join('');
+    tbody.querySelectorAll('.del-group-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Bu grubu silmek istediğine emin misin?')) return;
+        try { await adminApi('/group/'+btn.dataset.id, {method:'DELETE'}); toast('Grup silindi'); groups = groups.filter(g=>g.id!=btn.dataset.id); renderTable(groups); }
+        catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  };
+  renderTable(groups);
+  $('#group-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderTable(groups.filter(g => g.name.toLowerCase().includes(q) || (g.owner_name||'').toLowerCase().includes(q)));
+  });
+}
+
+// ===== LEVELS =====
+async function renderLevels(main) {
+  let levels = [];
+  try { levels = await adminApi('/levels'); } catch (e) {
+    main.innerHTML = `<p style="color:var(--red2);padding:20px">${e.message}</p>`; return;
+  }
+  const renderTable = () => {
+    const tbody = $('#levels-tbody'); if (!tbody) return;
+    if (!levels.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:32px">Seviye yok</td></tr>'; return; }
+    tbody.innerHTML = levels.map(l => `<tr>
+      <td><span style="font-size:18px">${escHtml(l.icon||'')}</span></td>
+      <td style="font-weight:600">${escHtml(l.name)}</td>
+      <td><span class="badge" style="background:${escHtml(l.color||'#666')};color:#fff;border:none">${escHtml(l.color||'—')}</span></td>
+      <td style="font-size:12px;color:var(--text2)">Forum: ${l.min_forums||0} / Kitap: ${l.min_books||0} / Sayfa: ${l.min_book_pages||0}</td>
+      <td style="font-size:12px;color:var(--text2)">${l.order_num}</td>
+      <td>
+        <button class="btn btn-danger btn-xs del-level-btn" data-id="${l.id}"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+    tbody.querySelectorAll('.del-level-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Bu seviyeyi silmek istediğine emin misin?')) return;
+        try { await adminApi('/level/'+btn.dataset.id, {method:'DELETE'}); toast('Seviye silindi'); levels = levels.filter(l=>l.id!=btn.dataset.id); renderTable(); }
+        catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  };
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-layer-group"></i></div> Seviyeler</div>
+      <button class="btn btn-primary btn-sm" id="new-level-btn"><i class="fas fa-plus"></i> Yeni Seviye</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>İkon</th><th>İsim</th><th>Renk</th><th>Koşullar</th><th>Sıra</th><th>İşlem</th></tr></thead>
+          <tbody id="levels-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+  renderTable();
+  $('#new-level-btn').addEventListener('click', () => {
+    showModal('Yeni Seviye Ekle', `
+      <div class="form-group"><label>İsim</label><input id="lv-name" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>İkon (emoji)</label><input id="lv-icon" placeholder="⭐" /></div>
+        <div class="form-group"><label>Renk</label><input id="lv-color" type="color" value="#dc2626" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Min. Forum</label><input id="lv-forums" type="number" value="0" /></div>
+        <div class="form-group"><label>Min. Kitap</label><input id="lv-books" type="number" value="0" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Min. Kitap Sayfası</label><input id="lv-pages" type="number" value="0" /></div>
+        <div class="form-group"><label>Sıra</label><input id="lv-order" type="number" value="${levels.length+1}" /></div>
+      </div>
+      <div id="lv-err" class="form-error"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px" id="lv-save-btn"><i class="fas fa-save"></i> Kaydet</button>
+    `);
+    $('#lv-save-btn').addEventListener('click', async () => {
+      const err = $('#lv-err');
+      const name = $('#lv-name').value.trim();
+      if (!name) { err.textContent='İsim zorunlu'; return; }
+      try {
+        const body = { name, icon:$('#lv-icon').value, color:$('#lv-color').value, min_forums:+$('#lv-forums').value, min_books:+$('#lv-books').value, min_book_pages:+$('#lv-pages').value, order_num:+$('#lv-order').value };
+        const nl = await adminApi('/levels', {method:'POST', body:JSON.stringify(body)});
+        levels.push(nl); renderTable(); hideModal(); toast('Seviye eklendi');
+      } catch(e) { err.textContent=e.message; }
+    });
+  });
+}
+
+// ===== TAGS =====
+async function renderTags(main) {
+  let tags = [];
+  try { tags = await adminApi('/tags'); } catch (e) {
+    main.innerHTML = `<p style="color:var(--red2);padding:20px">${e.message}</p>`; return;
+  }
+  const renderTable = () => {
+    const tbody = $('#tags-tbody'); if (!tbody) return;
+    if (!tags.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:32px">Etiket yok</td></tr>'; return; }
+    tbody.innerHTML = tags.map(t => `<tr>
+      <td><span class="badge" style="background:${escHtml(t.color||'#666')}22;color:${escHtml(t.color||'#aaa')};border:1px solid ${escHtml(t.color||'#666')}44">${escHtml(t.name)}</span></td>
+      <td style="font-size:12px;color:var(--text3)">${escHtml(t.color||'—')}</td>
+      <td>${t.is_system ? '<span class="badge badge-blue">Sistem</span>' : '<span class="badge badge-gray">Özel</span>'}</td>
+      <td><button class="btn btn-danger btn-xs del-tag-btn" data-id="${t.id}" ${t.is_system?'disabled':''} title="${t.is_system?'Sistem etiketi silinemez':'Sil'}"><i class="fas fa-trash"></i></button></td>
+    </tr>`).join('');
+    tbody.querySelectorAll('.del-tag-btn:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Bu etiketi silmek istediğine emin misin?')) return;
+        try { await adminApi('/tag/'+btn.dataset.id, {method:'DELETE'}); toast('Etiket silindi'); tags = tags.filter(t=>t.id!=btn.dataset.id); renderTable(); }
+        catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  };
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-tags"></i></div> Etiketler</div>
+      <button class="btn btn-primary btn-sm" id="new-tag-btn"><i class="fas fa-plus"></i> Yeni Etiket</button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Etiket</th><th>Renk</th><th>Tür</th><th>İşlem</th></tr></thead>
+          <tbody id="tags-tbody"></tbody>
+        </table>
+      </div>
+    </div>`;
+  renderTable();
+  $('#new-tag-btn').addEventListener('click', () => {
+    showModal('Yeni Etiket Ekle', `
+      <div class="form-group"><label>İsim</label><input id="tag-name" /></div>
+      <div class="form-group"><label>Renk</label><input id="tag-color" type="color" value="#5865F2" /></div>
+      <div id="tag-err" class="form-error"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px" id="tag-save-btn"><i class="fas fa-save"></i> Kaydet</button>
+    `);
+    $('#tag-save-btn').addEventListener('click', async () => {
+      const err = $('#tag-err');
+      const name = $('#tag-name').value.trim();
+      if (!name) { err.textContent='İsim zorunlu'; return; }
+      try {
+        const nt = await adminApi('/tags', {method:'POST', body:JSON.stringify({name, color:$('#tag-color').value})});
+        tags.push(nt); renderTable(); hideModal(); toast('Etiket eklendi');
+      } catch(e) { err.textContent=e.message; }
+    });
+  });
+}
+
+// ===== LOGS =====
+async function renderLogs(main) {
+  let logs = [];
+  try { logs = await adminApi('/logs'); } catch (e) {
+    main.innerHTML = `<p style="color:var(--red2);padding:20px">${e.message}</p>`; return;
+  }
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-history"></i></div> Sistem Logları <span style="font-size:13px;font-weight:400;color:var(--text2)">(${logs.length})</span></div>
+      <div class="adm-search"><i class="fas fa-search"></i><input type="text" id="log-search" placeholder="Eylem veya aktör ara..." style="min-width:240px" /></div>
+    </div>
+    <div class="card">
+      <div id="logs-list">
+        ${logs.length ? logs.map(l => `
+          <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px">
+            <span style="color:var(--red2);font-weight:600;min-width:100px">${escHtml(l.actor)}</span>
+            <span style="color:var(--text2);font-size:11px;margin-right:4px"><i class="fas fa-arrow-right"></i></span>
+            <span style="flex:1">${escHtml(l.action)}${l.target?' <span style="color:var(--text3)">→ '+escHtml(l.target)+'</span>':''}</span>
+            <span style="color:var(--text3);font-size:11px;white-space:nowrap">${timeAgo(l.created_at)}</span>
+          </div>`).join('') : '<div style="padding:32px;text-align:center;color:var(--text3)">Log yok</div>'}
+      </div>
+    </div>`;
+  $('#log-search').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    const filtered = logs.filter(l => l.actor.toLowerCase().includes(q) || l.action.toLowerCase().includes(q));
+    $('#logs-list').innerHTML = filtered.length ? filtered.map(l => `
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:10px">
+        <span style="color:var(--red2);font-weight:600;min-width:100px">${escHtml(l.actor)}</span>
+        <span style="color:var(--text2);font-size:11px;margin-right:4px"><i class="fas fa-arrow-right"></i></span>
+        <span style="flex:1">${escHtml(l.action)}${l.target?' <span style="color:var(--text3)">→ '+escHtml(l.target)+'</span>':''}</span>
+        <span style="color:var(--text3);font-size:11px;white-space:nowrap">${timeAgo(l.created_at)}</span>
+      </div>`).join('') : '<div style="padding:32px;text-align:center;color:var(--text3)">Sonuç bulunamadı</div>';
+  });
+}
+
+// ===== MESSAGES =====
+async function renderAdminMessages(main) {
+  let convs = [];
+  try { convs = await adminApi('/conversations'); } catch (e) {
+    main.innerHTML = `<p style="color:var(--red2);padding:20px">${e.message}</p>`; return;
+  }
+  main.innerHTML = `
+    <div class="adm-section-header">
+      <div class="adm-section-title"><div class="icon-pill"><i class="fas fa-envelope"></i></div> Mesajlar <span style="font-size:13px;font-weight:400;color:var(--text2)">(${convs.length})</span></div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kullanıcı 1</th><th>Kullanıcı 2</th><th>Son Mesaj</th><th>İşlem</th></tr></thead>
+          <tbody>
+            ${convs.length ? convs.map(c => `<tr>
+              <td style="color:var(--text3);font-size:12px">#${c.id}</td>
+              <td style="color:var(--blue2)">${escHtml(c.user1||'—')}</td>
+              <td style="color:var(--blue2)">${escHtml(c.user2||'—')}</td>
+              <td style="color:var(--text3);font-size:12px">${timeAgo(c.last_message_at)}</td>
+              <td><button class="btn btn-outline btn-xs view-conv-btn" data-id="${c.id}" data-u1="${escHtml(c.user1||'')}" data-u2="${escHtml(c.user2||'')}"><i class="fas fa-eye"></i> Gör</button></td>
+            </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:32px">Konuşma bulunamadı</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  main.querySelectorAll('.view-conv-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const msgs = await adminApi('/conversations/'+btn.dataset.id+'/messages');
+        const u1 = btn.dataset.u1, u2 = btn.dataset.u2;
+        showModal(`${u1} ↔ ${u2}`, `
+          <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
+            ${msgs.length ? msgs.map(m => `
+              <div style="padding:8px 12px;border-radius:8px;background:var(--bg4);font-size:13px">
+                <span style="color:var(--blue2);font-weight:600">${escHtml(m.sender_username)}</span>
+                <span style="color:var(--text3);font-size:11px;margin-left:8px">${timeAgo(m.created_at)}</span>
+                <div style="margin-top:4px;color:var(--text)">${escHtml(m.content)}</div>
+              </div>`).join('') : '<div style="color:var(--text3);text-align:center;padding:20px">Mesaj yok</div>'}
+          </div>
+        `);
+      } catch(e) { toast(e.message, 'error'); }
+    });
+  });
+}
+
 // ===== DUYURULAR =====
 async function renderAnnouncements(main) {
   let anns = [];
