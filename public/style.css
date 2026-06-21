@@ -566,14 +566,12 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
 
 /* ===== EBOOK READER ===== */
 .ebook-reader {
-  max-width: 680px;
-  margin: 0 auto;
+  min-width: 0;
+  width: 100%;
   background: #1c1410;
   border-radius: 16px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   overflow: hidden;
-  min-width: 0;
-  width: 100%;
   box-sizing: border-box;
 }
 .ebook-toolbar {
@@ -667,10 +665,11 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
 }
 .ebook-layout {
   display: flex;
-  max-width: 960px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
   gap: 0;
   align-items: flex-start;
+  overflow: hidden;
 }
 .font-size-controls button {
   background: none;
