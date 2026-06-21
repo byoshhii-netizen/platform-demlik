@@ -127,10 +127,11 @@ function renderContent(text) {
 
 function navigate(path, push = true) {
   if (push) history.pushState({}, '', path);
+  // path içindeki query string'i renderRoute'a geçir
   renderRoute(path);
 }
 
-window.addEventListener('popstate', () => renderRoute(location.pathname));
+window.addEventListener('popstate', () => renderRoute(location.pathname + location.search));
 
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-link]');
@@ -140,13 +141,15 @@ document.addEventListener('click', e => {
   }
 });
 
-function renderRoute(path) {
+function renderRoute(fullPath) {
+  // Query string'i ayır
+  const [path, queryStr] = fullPath.split('?');
   updateNavActive(path);
   const app = $('#app');
   const segs = path.split('/').filter(Boolean);
 
   if (path === '/') return renderHome(app);
-  if (path === '/forum') return renderForumList(app);
+  if (path === '/forum') return renderForumList(app);  // location.search ile query param okunuyor
   if (path.startsWith('/forum/')) {
     const slug = segs.slice(1).join('/');
     return renderForumDetail(app, slug);
@@ -2285,7 +2288,7 @@ async function init() {
     }
   } catch {}
   loadAnnouncements();
-  renderRoute(location.pathname);
+  renderRoute(location.pathname + location.search);
   if (currentUser) {
     checkUnreadMessages();
     setInterval(() => { if (currentUser) checkUnreadMessages(); }, 15000);

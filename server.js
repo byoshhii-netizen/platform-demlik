@@ -477,7 +477,9 @@ async function parseMentionsAndNotify(content, actorUser, type, link, contextTit
   for (const username of mentions) {
     if (username.toLowerCase() === actorUser.username.toLowerCase()) continue;
     const { rows } = await query('SELECT id, allow_mentions FROM users WHERE LOWER(username)=$1 AND is_deleted=0', [username]);
-    if (!rows.length || !rows[0].allow_mentions) continue;
+    if (!rows.length) continue;
+    // allow_mentions NULL ise varsayılan olarak açık say (1)
+    if (rows[0].allow_mentions !== null && rows[0].allow_mentions == 0) continue;
     const body = type === 'forum_mention'
       ? `@${actorUser.username} sizi bir konuda etiketledi: "${contextTitle}"`
       : `@${actorUser.username} bir mesajında sizi etiketledi`;
