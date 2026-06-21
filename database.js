@@ -358,6 +358,21 @@ async function initDb() {
     ALTER TABLE songs ADD COLUMN IF NOT EXISTS ban_until TIMESTAMP;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_requested_at TIMESTAMP;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS allow_mentions INTEGER DEFAULT 1;
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      type TEXT NOT NULL,
+      actor_username TEXT DEFAULT '',
+      actor_avatar TEXT DEFAULT '',
+      title TEXT DEFAULT '',
+      body TEXT DEFAULT '',
+      link TEXT DEFAULT '',
+      is_read INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
 
     CREATE TABLE IF NOT EXISTS artist_applications (
       id BIGSERIAL PRIMARY KEY,

@@ -443,6 +443,52 @@ async function purgeDeletedAccounts() {
 }
 
 
+// ===== BİLDİRİM YARDIMCISI =====
+async function parseMentionsAndNotify(content, actorUser, type, link, contextTitle = '') {
+  const mentions = [...new Set(
+    (content.match(/@([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]+)/g) || []).map(m => m.slice(1).toLowerCase())
+  )];
+  for (const username of mentions) {
+    if (username.toLowerCase() === actorUser.username.toLowerCase()) continue;
+    const { rows } = await query('SELECT id, allow_mentions FROM users WHERE LOWER(username)=$1 AND is_deleted=0', [username]);
+    if (!rows.length || !rows[0].allow_mentions) continue;
+    const body = type === 'forum_mention'
+      ? `@${actorUser.username} sizi bir konuda etiketledi: "${contextTitle}"`
+      : `@${actorUser.username} bir mesajında sizi etiketledi`;
+    await query(
+      'INSERT INTO notifications (user_id, type, actor_username, actor_avatar, title, body, link) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+      [rows[0].id, type, actorUser.username, actorUser.avatar || '', contextTitle, body, link]
+    );
+  }
+}
+
+// ===== BİLDİRİM ENDPOİNTLERİ =====
+app.get('/api/notifications', authMiddleware, async (req, res) => {
+  const { rows } = await query(
+    'SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50',
+    [req.user.id]
+  );
+  res.json(rows);
+});
+
+app.get('/api/notifications/unread-count', authMiddleware, async (req, res) => {
+  const { rows } = await query(
+    'SELECT COUNT(*) as c FROM notifications WHERE user_id=$1 AND is_read=0',
+    [req.user.id]
+  );
+  res.json({ count: parseInt(rows[0].c) });
+});
+
+app.post('/api/notifications/read-all', authMiddleware, async (req, res) => {
+  await query('UPDATE notifications SET is_read=1 WHERE user_id=$1', [req.user.id]);
+  res.json({ ok: true });
+});
+
+app.delete('/api/notifications/:id', authMiddleware, async (req, res) => {
+  await query('DELETE FROM notifications WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+  res.json({ ok: true });
+});
+
 // ===== FORUMS =====
 app.get('/api/forums', async (req, res) => {
   const { tag } = req.query;
@@ -524,6 +570,8 @@ app.post('/api/forums', authMiddleware, async (req, res) => {
     await query('UPDATE users SET forum_count=forum_count+1 WHERE id=$1', [req.user.id]);
     await updateUserLevel(req.user.id);
     await logAction(req.user.username, 'create_forum', realSlug);
+    // @mention bildirimleri
+    await parseMentionsAndNotify(content + ' ' + title, req.user, 'forum_mention', '/forum/' + realSlug, title).catch(() => {});
     const { rows: fRows } = await query('SELECT * FROM forums WHERE id=$1', [id]);
     res.json(fRows[0]);
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -601,6 +649,8 @@ app.post('/api/forum/:slug/comments', authMiddleware, async (req, res) => {
   const { rows } = await query('INSERT INTO forum_comments (forum_id,user_id,content) VALUES ($1,$2,$3) RETURNING id', [forum.id, req.user.id, content.trim()]);
   await query('UPDATE users SET comment_count=comment_count+1 WHERE id=$1', [req.user.id]);
   await updateUserLevel(req.user.id);
+  // @mention bildirimleri
+  await parseMentionsAndNotify(content, req.user, 'comment_mention', '/forum/' + req.params.slug, forum.title).catch(() => {});
   const { rows: cRows } = await query(`SELECT fc.*, u.username, u.avatar, u.name_color, u.is_vip, u.level_id FROM forum_comments fc LEFT JOIN users u ON fc.user_id=u.id WHERE fc.id=$1`, [rows[0].id]);
   res.json(cRows[0]);
 });
@@ -1047,7 +1097,7 @@ app.get('/api/profile/:username', async (req, res) => {
 });
 
 app.put('/api/profile', authMiddleware, upload.single('avatar'), async (req, res) => {
-  const { bio, links, name_color, show_level_badge, show_level_color, title, location } = req.body;
+  const { bio, links, name_color, show_level_badge, show_level_color, title, location, allow_mentions } = req.body;
   let newAvatar = req.user.avatar;
   if (req.file) {
     try {
@@ -1057,11 +1107,13 @@ app.put('/api/profile', authMiddleware, upload.single('avatar'), async (req, res
     }
   }
   const newLinks = links ? (typeof links === 'string' ? links : JSON.stringify(links)) : req.user.links;
-  await query('UPDATE users SET bio=$1,links=$2,name_color=$3,show_level_badge=$4,show_level_color=$5,avatar=$6,title=$7,location=$8 WHERE id=$9',
+  await query('UPDATE users SET bio=$1,links=$2,name_color=$3,show_level_badge=$4,show_level_color=$5,avatar=$6,title=$7,location=$8,allow_mentions=$9 WHERE id=$10',
     [bio??req.user.bio, newLinks, name_color??req.user.name_color,
      show_level_badge!==undefined?(show_level_badge?1:0):req.user.show_level_badge,
      show_level_color!==undefined?(show_level_color?1:0):req.user.show_level_color,
-     newAvatar, title??req.user.title??'', location??req.user.location??'', req.user.id]);
+     newAvatar, title??req.user.title??'', location??req.user.location??'',
+     allow_mentions!==undefined?(allow_mentions?1:0):(req.user.allow_mentions??1),
+     req.user.id]);
   const { rows } = await query('SELECT * FROM users WHERE id=$1', [req.user.id]);
   res.json(sanitizeUser(rows[0]));
 });
@@ -2233,6 +2285,10 @@ app.post('/api/conversation/:username/messages', authMiddleware, upload.single('
   // Forum paylaşım sayısını artır
   if (shared_forum_id) {
     await query('UPDATE forums SET share_count=COALESCE(share_count,0)+1 WHERE id=$1', [shared_forum_id]);
+  }
+  // DM @mention bildirimleri
+  if (content?.trim()) {
+    await parseMentionsAndNotify(content, req.user, 'dm_mention', '/mesajlar/' + req.params.username).catch(() => {});
   }
   const { rows: full } = await query(`
     SELECT m.*, u.username as sender_username, u.avatar as sender_avatar, u.name_color as sender_name_color,

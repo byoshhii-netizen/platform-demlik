@@ -111,6 +111,21 @@ function avatarImg(u, cls = 'avatar-sm') {
   return `<div class="${cls} avatar-placeholder" style="font-size:0.75em;font-weight:700;color:var(--text-muted)">?</div>`;
 }
 
+// ===== IÇERIK RENDER (hashtag + mention) =====
+function renderContent(text) {
+  if (!text) return '';
+  // XSS güvenli: önce escape, sonra pattern'lere dönüştür
+  const safe = String(text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return safe
+    // #hashtag → mavi tıklanabilir link
+    .replace(/#([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]+)/g, (_, tag) =>
+      `<a href="/forum?tag=${encodeURIComponent(tag)}" data-link class="inline-hashtag">#${tag}</a>`)
+    // @mention → profil link
+    .replace(/@([a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]+)/g, (_, user) =>
+      `<a href="/profil/${encodeURIComponent(user)}" data-link class="inline-mention">@${user}</a>`);
+}
+
 function navigate(path, push = true) {
   if (push) history.pushState({}, '', path);
   renderRoute(path);
@@ -244,11 +259,71 @@ $('#nav-user-btn').addEventListener('click', () => {
 document.addEventListener('click', e => {
   if (!$('#nav-dropdown')?.contains(e.target)) $('#dropdown-menu')?.classList.add('hidden');
   if (!$('#new-btn-wrap')?.contains(e.target)) $('#new-dropdown')?.classList.add('hidden');
+  if (!$('#notif-btn-wrap')?.contains(e.target)) $('#notif-dropdown')?.classList.add('hidden');
 });
 
 $('#nav-new-btn')?.addEventListener('click', e => {
   e.stopPropagation();
   $('#new-dropdown').classList.toggle('hidden');
+});
+
+// ===== BİLDİRİM SİSTEMİ =====
+let notifPollTimer = null;
+
+async function loadNotifCount() {
+  if (!currentUser) return;
+  try {
+    const data = await api('/notifications/unread-count');
+    const badge = $('#nav-notif-badge');
+    if (!badge) return;
+    if (data.count > 0) { badge.style.display = ''; badge.textContent = data.count > 9 ? '9+' : data.count; }
+    else { badge.style.display = 'none'; }
+  } catch {}
+}
+
+async function openNotifDropdown() {
+  const dd = $('#notif-dropdown');
+  if (!dd) return;
+  dd.classList.toggle('hidden');
+  if (dd.classList.contains('hidden')) return;
+  dd.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted)"><div class="spinner" style="margin:0 auto"></div></div>';
+  try {
+    const notifs = await api('/notifications');
+    await api('/notifications/read-all', { method: 'POST' });
+    const badge = $('#nav-notif-badge'); if (badge) badge.style.display = 'none';
+    if (!notifs.length) {
+      dd.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px"><i class="fas fa-bell-slash" style="font-size:24px;margin-bottom:8px;display:block"></i>Bildirim yok</div>';
+      return;
+    }
+    dd.innerHTML = `
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;display:flex;justify-content:space-between;align-items:center">
+        <span><i class="fas fa-bell" style="color:var(--accent-red2);margin-right:6px"></i>Bildirimler</span>
+      </div>
+      ${notifs.map(n => `
+        <div class="notif-item${n.is_read ? '' : ' notif-unread'}" data-link="${escHtml(n.link||'')}" data-id="${n.id}" style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            ${n.actor_avatar ? `<img src="${escHtml(n.actor_avatar)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" />` : `<div style="width:32px;height:32px;border-radius:50%;background:var(--bg-card2);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-bell" style="font-size:12px;color:var(--accent-red2)"></i></div>`}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;line-height:1.4">${escHtml(n.body)}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${timeAgo(n.created_at)}</div>
+            </div>
+          </div>
+        </div>`).join('')}`;
+    dd.querySelectorAll('.notif-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const link = item.dataset.link;
+        $('#notif-dropdown').classList.add('hidden');
+        if (link) navigate(link);
+      });
+    });
+  } catch(e) {
+    dd.innerHTML = `<div style="padding:16px;color:var(--accent-red2);font-size:13px">${e.message}</div>`;
+  }
+}
+
+$('#nav-notif-btn')?.addEventListener('click', e => {
+  e.stopPropagation();
+  openNotifDropdown();
 });
 $('#nav-new-forum')?.addEventListener('click', () => { $('#new-dropdown').classList.add('hidden'); navigate('/forum'); setTimeout(() => { if (currentUser) showNewForumModal(); else navigate('/giris'); }, 100); });
 $('#nav-new-book')?.addEventListener('click', () => { $('#new-dropdown').classList.add('hidden'); navigate('/kitaplar'); setTimeout(() => { if (currentUser) showNewBookModal(); else navigate('/giris'); }, 100); });
@@ -629,7 +704,7 @@ async function renderForumDetail(app, slug) {
           ${forum.share_count ? `<span><i class="fas fa-share-alt" style="color:var(--accent-red)"></i> ${forum.share_count} iletildi</span>` : ''}
         </div>
       ${forum.banner_image ? `<img src="${escHtml(forum.banner_image)}" class="forum-detail-banner" alt="" />` : ''}
-      <div class="forum-detail-content">${escHtml(forum.content)}</div>
+      <div class="forum-detail-content">${renderContent(forum.content)}</div>
       ${(() => {
         const sTags = Array.isArray(forum.system_tags) ? forum.system_tags : (typeof forum.system_tags === 'string' ? (() => { try { return JSON.parse(forum.system_tags); } catch { return []; } })() : []);
         const cTags = forum.custom_tags ? forum.custom_tags.split(',').map(t => t.trim()).filter(Boolean) : [];
@@ -734,7 +809,7 @@ function commentHTML(c) {
         <span class="comment-author">${userDisplayName(c)}</span>
         <span class="comment-time">${timeAgo(c.created_at)}</span>
       </div>
-      <div class="comment-content">${escHtml(c.content)}</div>
+      <div class="comment-content">${renderContent(c.content)}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
         <div style="display:flex;align-items:center;gap:8px">
           ${canDel ? `<button class="btn btn-ghost btn-sm del-comment" data-id="${c.id}" style="padding:2px 6px;color:var(--accent-red2)"><i class="fas fa-trash"></i></button>` : ''}
@@ -1658,6 +1733,7 @@ async function renderSettings(app) {
         <div class="settings-nav-item active" data-section="profile"><i class="fas fa-user"></i> Profil</div>
         <div class="settings-nav-item" data-section="password"><i class="fas fa-lock"></i> Şifre</div>
         <div class="settings-nav-item" data-section="appearance"><i class="fas fa-palette"></i> Görünüm</div>
+        <div class="settings-nav-item" data-section="notifications"><i class="fas fa-bell"></i> Bildirimler</div>
         <div class="settings-nav-item" data-section="spotify"><i class="fab fa-spotify" style="color:#1ED760"></i> Spotify</div>
         <div class="settings-nav-item" data-section="account" style="color:var(--accent-red2)"><i class="fas fa-exclamation-triangle"></i> Hesap</div>
       </div>
@@ -1815,6 +1891,35 @@ function renderSettingsSection(section) {
         currentUser = updated; updateNavUI();
         toast('Görünüm güncellendi');
       } catch (e) { $('#appear-msg').textContent = e.message; }
+    });
+  } else if (section === 'notifications') {
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header"><span><i class="fas fa-bell" style="color:var(--accent-red2);margin-right:6px"></i>Bildirim Ayarları</span></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="checkbox-label" style="align-items:flex-start;gap:12px">
+              <input type="checkbox" id="s-allow-mentions" style="width:auto;margin-top:3px" ${(currentUser.allow_mentions ?? 1) ? 'checked' : ''} />
+              <div>
+                <div style="font-weight:600;font-size:14px">Beni etiketleyen kişilere bildirim gönder</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:3px">
+                  Kapatırsan kimse seni @etiketleyemez ve bildirim almaz, profil linki de açılmaz
+                </div>
+              </div>
+            </label>
+          </div>
+          <button class="btn btn-primary" id="save-notif-btn">Kaydet</button>
+          <div id="notif-settings-msg" class="form-error mt-4"></div>
+        </div>
+      </div>`;
+    $('#save-notif-btn').addEventListener('click', async () => {
+      const fd = new FormData();
+      fd.append('allow_mentions', $('#s-allow-mentions').checked ? '1' : '0');
+      try {
+        const updated = await apiForm('/profile', fd, 'PUT');
+        currentUser = updated; updateNavUI();
+        toast('Bildirim ayarları kaydedildi');
+      } catch(e) { $('#notif-settings-msg').textContent = e.message; }
     });
   } else if (section === 'spotify') {
     const hasSpotify = !!(currentUser.spotify_token || currentUser.spotify_expires > 0);
@@ -2160,7 +2265,12 @@ async function init() {
   } catch {}
   loadAnnouncements();
   renderRoute(location.pathname);
-  if (currentUser) { checkUnreadMessages(); setInterval(() => { if (currentUser) checkUnreadMessages(); }, 15000); }
+  if (currentUser) {
+    checkUnreadMessages();
+    setInterval(() => { if (currentUser) checkUnreadMessages(); }, 15000);
+    loadNotifCount();
+    setInterval(() => { if (currentUser) loadNotifCount(); }, 30000);
+  }
 }
 
 async function loadAnnouncements() {

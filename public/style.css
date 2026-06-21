@@ -482,6 +482,19 @@ label { display: block; font-size: 13px; font-weight: 500; color: var(--text-sec
 .modal-close:hover { color: var(--text-primary); }
 .modal-body { padding: 0 24px 24px; }
 
+/* ===== MENTION & HASHTAG ===== */
+.inline-mention {
+  color: #5865F2; font-weight: 600; text-decoration: none;
+  background: rgba(88,101,242,0.1); border-radius: 4px; padding: 0 3px;
+  transition: background .15s;
+}
+.inline-mention:hover { background: rgba(88,101,242,0.2); }
+.inline-hashtag {
+  color: #5865F2; font-weight: 600; text-decoration: none;
+  transition: opacity .15s;
+}
+.inline-hashtag:hover { opacity: 0.75; }
+
 /* ===== TOAST ===== */
 #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 10000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .toast { background: var(--bg-card2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 18px; font-size: 14px; min-width: 220px; max-width: 360px; box-shadow: var(--shadow); animation: toastIn 0.25s ease; display: flex; align-items: center; gap: 10px; pointer-events: all; }
