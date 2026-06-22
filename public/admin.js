@@ -400,21 +400,57 @@ async function renderForums(main) {
     <div class="card">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>Başlık</th><th>Yazar</th><th>Tarih</th><th>İşlem</th></tr></thead>
+          <thead><tr><th>ID</th><th>Başlık</th><th>Yazar</th><th>Görüntülenme</th><th>Beğeni</th><th>Tarih</th><th>İşlem</th></tr></thead>
           <tbody id="forums-tbody"></tbody>
         </table>
       </div>
     </div>`;
   const renderTable = (list) => {
     const tbody = $('#forums-tbody'); if (!tbody) return;
-    if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:32px">Konu bulunamadı</td></tr>'; return; }
+    if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:32px">Konu bulunamadı</td></tr>'; return; }
     tbody.innerHTML = list.map(f => `<tr>
       <td style="color:var(--text3);font-size:12px">#${f.id}</td>
-      <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.title)}">${escHtml(f.title)}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.title)}">${escHtml(f.title)}</td>
       <td><span style="color:var(--blue2)">${escHtml(f.username||'—')}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${f.views||0} <i class="fas fa-eye" style="font-size:10px"></i></td>
+      <td style="font-size:12px;color:var(--text2)">${f.like_count||0} <i class="fas fa-heart" style="font-size:10px;color:#ef4444"></i></td>
       <td style="color:var(--text3);font-size:12px">${timeAgo(f.created_at)}</td>
-      <td><button class="btn btn-danger btn-xs del-forum-btn" data-id="${f.id}"><i class="fas fa-trash"></i> Sil</button></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-outline btn-xs edit-forum-btn" data-id="${f.id}" title="Düzenle"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-danger btn-xs del-forum-btn" data-id="${f.id}"><i class="fas fa-trash"></i> Sil</button>
+        </div>
+      </td>
     </tr>`).join('');
+    tbody.querySelectorAll('.edit-forum-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const f = forums.find(x => x.id == btn.dataset.id);
+        if (!f) return;
+        showModal(`✏️ Konu Düzenle — #${f.id}`, `
+          <div class="form-group"><label>Başlık</label><input id="ef-title" value="${escHtml(f.title)}" /></div>
+          <div class="form-row">
+            <div class="form-group"><label>Görüntülenme</label><input id="ef-views" type="number" value="${f.views||0}" /></div>
+          </div>
+          <div id="ef-err" class="form-error"></div>
+          <button class="btn btn-primary" id="ef-save" style="width:100%;justify-content:center;margin-top:12px"><i class="fas fa-save"></i> Kaydet</button>
+        `);
+        $('#ef-save').addEventListener('click', async () => {
+          const btn2 = $('#ef-save'); const err = $('#ef-err');
+          btn2.disabled = true; btn2.innerHTML = '<div class="spinner" style="width:14px;height:14px"></div>';
+          try {
+            const body = {
+              title: $('#ef-title').value.trim() || f.title,
+              views: parseInt($('#ef-views').value) || 0
+            };
+            await adminApi('/forum/'+f.id, { method:'PUT', body:JSON.stringify(body) });
+            toast('Konu güncellendi');
+            const idx = forums.findIndex(x => x.id == f.id);
+            if (idx !== -1) { forums[idx] = { ...forums[idx], ...body }; }
+            hideModal(); renderTable(forums);
+          } catch(e) { err.textContent = e.message; btn2.disabled=false; btn2.innerHTML='<i class="fas fa-save"></i> Kaydet'; }
+        });
+      });
+    });
     tbody.querySelectorAll('.del-forum-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('Bu konuyu silmek istediğine emin misin?')) return;

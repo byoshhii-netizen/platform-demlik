@@ -41,27 +41,36 @@ app.set('trust proxy', 1);
 
 // ===== GÜVENLİK BAŞLIKLARI =====
 app.use((req, res, next) => {
-  // Kaynak kodunu tarayıcı devtools'dan gizleme (tam gizleme mümkün değil ama engelleme sinyali)
+  // ads.txt, robots.txt gibi metin dosyalarına güvenlik header'larını uygulama
+  if (req.path === '/ads.txt' || req.path === '/robots.txt' || req.path === '/sitemap.xml') {
+    return next();
+  }
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://pagead2.googlesyndication.com https://www.googletagmanager.com; " +
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://pagead2.googlesyndication.com https://partner.googleadservices.com https://www.googletagmanager.com https://googleads.g.doubleclick.net; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " +
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; " +
     "img-src 'self' data: https: blob:; " +
     "media-src 'self' https: blob:; " +
-    "connect-src 'self' https://api.spotify.com; " +
-    "frame-src 'none';"
+    "connect-src 'self' https://api.spotify.com https://pagead2.googlesyndication.com; " +
+    "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com;"
   );
   // Statik dosyalarda source map'leri engelle
   if (req.path.endsWith('.map')) {
     return res.status(404).end();
   }
   next();
+});
+
+// ads.txt explicit route — Google AdSense için zorunlu
+app.get('/ads.txt', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'public', 'ads.txt'));
 });
 
 const SITE_URL = process.env.SITE_URL || 'https://demlik.up.railway.app';
@@ -1246,9 +1255,12 @@ app.put('/api/admin/forum/:id', adminMiddleware, async (req, res) => {
   const { rows } = await query('SELECT * FROM forums WHERE id=$1', [req.params.id]);
   if (!rows.length) return res.status(404).json({ error: 'Konu bulunamadı' });
   const forum = rows[0];
-  const { title, content, allow_comments } = req.body;
-  await query('UPDATE forums SET title=$1,content=$2,allow_comments=$3 WHERE id=$4',
-    [title||forum.title, content||forum.content, allow_comments!==undefined?(allow_comments?1:0):forum.allow_comments, forum.id]);
+  const { title, content, allow_comments, views } = req.body;
+  await query('UPDATE forums SET title=$1,content=$2,allow_comments=$3,views=$4 WHERE id=$5',
+    [title||forum.title, content||forum.content,
+     allow_comments!==undefined?(allow_comments?1:0):forum.allow_comments,
+     views !== undefined ? Math.max(0, parseInt(views)||0) : (forum.views||0),
+     forum.id]);
   const { rows: updated } = await query('SELECT * FROM forums WHERE id=$1', [forum.id]);
   res.json(updated[0]);
 });
