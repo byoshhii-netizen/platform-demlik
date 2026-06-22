@@ -593,6 +593,7 @@ app.post('/api/forum/:slug/view', async (req, res) => {
 
 app.post('/api/forums', authMiddleware, async (req, res) => {
   try {
+    const { title, content, banner_image, allow_comments, tagIds, customTags, banner_fit, images, thumbnail } = req.body;
     if (!title || !content) return res.status(400).json({ error: 'Başlık ve içerik zorunlu' });
     const limitErr = await checkDailyLimit(req.user.id, req.user, 'forums');
     if (limitErr) return res.status(429).json({ error: limitErr });
