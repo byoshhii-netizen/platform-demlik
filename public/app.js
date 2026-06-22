@@ -485,6 +485,11 @@ function forumCardHTML(f) {
     ...customTags.map(t => `<span class="forum-tag forum-tag-custom" onclick="event.stopPropagation();navigateTag('${escHtml(t)}')">#${escHtml(t)}</span>`)
   ].join('');
 
+  // Kart thumbnail: önce thumbnail, yoksa 1. ek resim, yoksa banner
+  const extraImgs = Array.isArray(f.system_tags) ? [] : []; // system_tags zaten ayrı parse ediliyor
+  const parsedImages = (() => { try { return JSON.parse(f.images || '[]'); } catch { return []; } })();
+  const cardThumb = f.thumbnail || parsedImages[0] || f.banner_image || '';
+
   return `<div class="forum-card" onclick="navigate('/forum/${escHtml(f.slug)}')">
     <div class="forum-card-accent"></div>
     <div class="forum-card-body">
@@ -499,7 +504,7 @@ function forumCardHTML(f) {
         <span class="forum-meta-item" title="${dateStr} ${timeStr}"><i class="fas fa-clock"></i>${dateStr} ${timeStr}</span>
       </div>
     </div>
-    ${f.banner_image ? `<img src="${escHtml(f.banner_image)}" class="forum-card-banner" alt="" />` : ''}
+    ${cardThumb ? `<img src="${escHtml(cardThumb)}" class="forum-card-banner" alt="" />` : ''}
   </div>`;
 }
 
@@ -518,6 +523,11 @@ function showNewForumModal(existing = null) {
       <div id="fm-tags-checkboxes" style="display:none;max-height:160px;overflow-y:auto;background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:10px;display:none"></div>
       <div style="margin-top:8px"><small style="color:var(--text-muted)">veya virgülle ayırarak kendiniz ekleyin:</small></div>
       <input type="text" id="fm-custom-tags" placeholder="Örn: bilim, siyaset, teknoloji" style="margin-top:4px" />
+    </div>
+    <div class="form-group">
+      <label>Kart Küçük Resmi <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(opsiyonel — boş bırakırsan 1. ek resim ya da banner kullanılır)</span></label>
+      <input type="file" id="fm-thumb-file" accept="image/*" style="background:var(--bg-card2);border:1px dashed var(--border);padding:8px;cursor:pointer;border-radius:8px;margin-bottom:6px" />
+      ${existing && existing.thumbnail ? `<img id="fm-thumb-preview" src="${escHtml(existing.thumbnail)}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />` : `<div id="fm-thumb-preview" style="display:none"></div>`}
     </div>
     <div class="form-group">
       <label>Banner Resim (opsiyonel)</label>
@@ -583,6 +593,18 @@ function showNewForumModal(existing = null) {
     reader.onload = ev => {
       const prev = $('#fm-banner-preview');
       prev.outerHTML = `<img id="fm-banner-preview" src="${ev.target.result}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-top:4px" />`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Thumbnail önizleme
+  $('#fm-thumb-file')?.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const prev = $('#fm-thumb-preview');
+      if (prev) prev.outerHTML = `<img id="fm-thumb-preview" src="${ev.target.result}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />`;
     };
     reader.readAsDataURL(file);
   });
@@ -687,6 +709,16 @@ function showNewForumModal(existing = null) {
           xhr.send(fd);
         });
       }
+      // Thumbnail yükle
+      let thumbnailUrl = existing ? (existing.thumbnail || '') : '';
+      const thumbFile = $('#fm-thumb-file')?.files[0];
+      if (thumbFile) {
+        const thumbFd = new FormData(); thumbFd.append('file', thumbFile);
+        const thumbRes = await fetch('/api/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') }, body: thumbFd });
+        const thumbData = await thumbRes.json();
+        if (thumbRes.ok && thumbData.url) thumbnailUrl = thumbData.url;
+      }
+
       // Ek resimleri yükle
       const uploadedExtraImages = [...keptImages];
       for (let i = 0; i < extraImageFiles.length; i++) {
@@ -698,10 +730,10 @@ function showNewForumModal(existing = null) {
       }
 
       if (existing) {
-        await api('/forum/' + existing.slug, { method: 'PUT', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover', images: uploadedExtraImages }) });
+        await api('/forum/' + existing.slug, { method: 'PUT', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover', images: uploadedExtraImages, thumbnail: thumbnailUrl }) });
         toast('Konu güncellendi');
       } else {
-        const f = await api('/forums', { method: 'POST', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover', images: uploadedExtraImages }) });
+        const f = await api('/forums', { method: 'POST', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover', images: uploadedExtraImages, thumbnail: thumbnailUrl }) });
         toast('Konu oluşturuldu');
         hideModal();
         navigate('/forum/' + f.slug);

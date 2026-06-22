@@ -274,7 +274,16 @@ label { display: block; font-size: 13px; font-weight: 500; color: var(--text-sec
 .forum-card-meta { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .forum-meta-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); }
 .forum-meta-item i { color: var(--accent-red); font-size: 11px; }
-.forum-card-banner { width: 120px; height: 100%; min-height: 90px; flex-shrink: 0; object-fit: cover; }
+.forum-card-banner {
+  width: 110px;
+  height: 110px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 10px;
+  margin: 10px 10px 10px 0;
+  align-self: center;
+  border: 1px solid rgba(255,255,255,0.07);
+}
 
 /* Forum etiketleri */
 .forum-tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
@@ -743,7 +752,7 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   .forum-card { flex-direction: column; }
   .forum-card-accent { width: 100%; height: 3px; }
   .forum-card-body { padding: 14px; }
-  .forum-card-banner { width: 100%; height: 140px; min-height: unset; }
+  .forum-card-banner { width: 100%; height: 160px; min-height: unset; margin: 0; border-radius: 0 0 var(--radius) var(--radius); }
   .forum-card-title { font-size: 15px; }
   .forum-card-meta { gap: 10px; }
   .forum-meta-item { font-size: 11px; }
@@ -1112,7 +1121,7 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   /* Forum card banner */
   .forum-card { flex-direction: column !important; }
   .forum-card-accent { width: 100% !important; height: 3px !important; }
-  .forum-card-banner { width: 100% !important; height: 140px !important; min-height: unset !important; }
+  .forum-card-banner { width: 100% !important; height: 160px !important; min-height: unset !important; margin: 0 !important; border-radius: 0 0 var(--radius) var(--radius) !important; }
 
   /* Sayfa okuyucu */
   .page-nav { flex-direction: column !important; }
