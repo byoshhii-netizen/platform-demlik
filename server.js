@@ -481,7 +481,9 @@ async function parseMentionsAndNotify(content, actorUser, type, link, contextTit
     // allow_mentions NULL ise varsayılan olarak açık say (1)
     if (rows[0].allow_mentions !== null && rows[0].allow_mentions == 0) continue;
     const body = type === 'forum_mention'
-      ? `@${actorUser.username} sizi bir konuda etiketledi: "${contextTitle}"`
+      ? `@${actorUser.username} sizi "${contextTitle}" başlıklı konuda etiketledi`
+      : type === 'comment_mention'
+      ? `@${actorUser.username} sizi "${contextTitle}" konusundaki bir yorumda etiketledi`
       : `@${actorUser.username} bir mesajında sizi etiketledi`;
     await query(
       'INSERT INTO notifications (user_id, type, actor_username, actor_avatar, title, body, link) VALUES ($1,$2,$3,$4,$5,$6,$7)',
@@ -582,7 +584,7 @@ app.post('/api/forum/:slug/view', async (req, res) => {
 
 app.post('/api/forums', authMiddleware, async (req, res) => {
   try {
-    const { title, content, banner_image, allow_comments, tagIds, customTags, banner_fit } = req.body;
+    const { title, content, banner_image, allow_comments, tagIds, customTags, banner_fit, images } = req.body;
     if (!title || !content) return res.status(400).json({ error: 'Başlık ve içerik zorunlu' });
     const limitErr = await checkDailyLimit(req.user.id, req.user, 'forums');
     if (limitErr) return res.status(429).json({ error: limitErr });
@@ -593,8 +595,8 @@ app.post('/api/forums', authMiddleware, async (req, res) => {
     const allCustomTags = [...new Set([...manualTags.map(t => t.toLowerCase()), ...contentHashtags])];
     const customTagsStr = allCustomTags.join(',');
     const { rows } = await query(
-      'INSERT INTO forums (user_id,title,content,banner_image,slug,allow_comments,custom_tags,banner_fit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-      [req.user.id, title, content, banner_image || '', tempSlug, allow_comments !== false ? 1 : 0, customTagsStr, banner_fit || 'cover']);
+      'INSERT INTO forums (user_id,title,content,banner_image,slug,allow_comments,custom_tags,banner_fit,images) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+      [req.user.id, title, content, banner_image || '', tempSlug, allow_comments !== false ? 1 : 0, customTagsStr, banner_fit || 'cover', JSON.stringify(images || [])]);
     const id = rows[0].id;
     const realSlug = makeSlug(title, id);
     await query('UPDATE forums SET slug=$1 WHERE id=$2', [realSlug, id]);
@@ -618,17 +620,17 @@ app.put('/api/forum/:slug', authMiddleware, async (req, res) => {
   if (!fRows.length) return res.status(404).json({ error: 'Konu bulunamadı' });
   const forum = fRows[0];
   if (forum.user_id != req.user.id) return res.status(403).json({ error: 'Yetki yok' });
-  const { title, content, banner_image, allow_comments, tagIds, customTags, banner_fit } = req.body;
+  const { title, content, banner_image, allow_comments, tagIds, customTags, banner_fit, images } = req.body;
   // İçerik içindeki #tag'ları da custom_tags'e merge et
   const newContent = content || forum.content;
   const contentHashtags = (newContent.match(/#([a-zA-Z0-9_\u00c7\u00e7\u011e\u011f\u0130\u0131\u00d6\u00f6\u015e\u015f\u00dc\u00fc]+)/g) || []).map(t => t.slice(1).toLowerCase());
   const manualTagsPut = customTags !== undefined ? (Array.isArray(customTags) ? customTags : customTags.split(',').map(t => t.trim()).filter(Boolean)) : (forum.custom_tags ? forum.custom_tags.split(',').map(t => t.trim()).filter(Boolean) : []);
   const allCustomTagsPut = [...new Set([...manualTagsPut.map(t => t.toLowerCase()), ...contentHashtags])];
   const customTagsStr = allCustomTagsPut.join(',');
-  await query('UPDATE forums SET title=$1,content=$2,banner_image=$3,allow_comments=$4,custom_tags=$5,banner_fit=$6,updated_at=NOW() WHERE id=$7',
+  await query('UPDATE forums SET title=$1,content=$2,banner_image=$3,allow_comments=$4,custom_tags=$5,banner_fit=$6,images=$7,updated_at=NOW() WHERE id=$8',
     [title||forum.title, content||forum.content, banner_image??forum.banner_image,
      allow_comments!==undefined?(allow_comments?1:0):forum.allow_comments, customTagsStr,
-     banner_fit||forum.banner_fit||'cover', forum.id]);
+     banner_fit||forum.banner_fit||'cover', JSON.stringify(images !== undefined ? images : ((() => { try { return JSON.parse(forum.images||'[]'); } catch{return [];} })())) , forum.id]);
   if (tagIds !== undefined) {
     await query('DELETE FROM forum_tags WHERE forum_id=$1', [forum.id]);
     if (Array.isArray(tagIds)) for (const tid of tagIds) { try { await query('INSERT INTO forum_tags (forum_id,tag_id) VALUES ($1,$2)',[forum.id,tid]); } catch {} }

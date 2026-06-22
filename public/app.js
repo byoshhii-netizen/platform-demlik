@@ -539,6 +539,11 @@ function showNewForumModal(existing = null) {
       </div>
     </div>
     <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="fm-comments" ${!existing || existing.allow_comments ? 'checked' : ''} /> Yorumlara izin ver</label></div>
+    <div class="form-group">
+      <label>Ek Resimler <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(en fazla 5, her biri max 10MB)</span></label>
+      <input type="file" id="fm-images-file" accept="image/*" multiple style="background:var(--bg-card2);border:1px dashed var(--border);padding:8px;cursor:pointer;border-radius:8px" />
+      <div id="fm-images-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+    </div>
     <button class="btn btn-primary" id="fm-submit" style="width:100%">${existing ? 'Güncelle' : 'Yayınla'}</button>
     <div id="fm-error" class="form-error mt-4"></div>
   `);
@@ -586,6 +591,43 @@ function showNewForumModal(existing = null) {
   ['fm-title', 'fm-custom-tags'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+  });
+
+  // Ek resimler önizleme
+  const existingImages = existing ? (() => { try { return JSON.parse(existing.images || '[]'); } catch { return []; } })() : [];
+  let extraImageFiles = []; // yeni yüklenecekler
+  let keptImages = [...existingImages]; // mevcut (silinmeyenler)
+
+  const renderImgPreviews = () => {
+    const wrap = $('#fm-images-preview'); if (!wrap) return;
+    const existingHTML = keptImages.map((url, i) => `
+      <div style="position:relative;display:inline-block">
+        <img src="${escHtml(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+        <button type="button" data-kept="${i}" style="position:absolute;top:-6px;right:-6px;background:var(--accent-red);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+      </div>`).join('');
+    const newHTML = extraImageFiles.map((f, i) => {
+      const url = URL.createObjectURL(f);
+      return `<div style="position:relative;display:inline-block">
+        <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" />
+        <button type="button" data-new="${i}" style="position:absolute;top:-6px;right:-6px;background:var(--accent-red);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+      </div>`;
+    }).join('');
+    wrap.innerHTML = existingHTML + newHTML;
+    wrap.querySelectorAll('[data-kept]').forEach(btn => {
+      btn.addEventListener('click', () => { keptImages.splice(parseInt(btn.dataset.kept), 1); renderImgPreviews(); });
+    });
+    wrap.querySelectorAll('[data-new]').forEach(btn => {
+      btn.addEventListener('click', () => { extraImageFiles.splice(parseInt(btn.dataset.new), 1); renderImgPreviews(); });
+    });
+  };
+  if (keptImages.length) renderImgPreviews();
+
+  $('#fm-images-file')?.addEventListener('change', e => {
+    const files = Array.from(e.target.files);
+    const remaining = 5 - keptImages.length - extraImageFiles.length;
+    extraImageFiles = [...extraImageFiles, ...files.slice(0, remaining)];
+    e.target.value = '';
+    renderImgPreviews();
   });
 
   $('#fm-submit').addEventListener('click', async () => {
@@ -645,11 +687,21 @@ function showNewForumModal(existing = null) {
           xhr.send(fd);
         });
       }
+      // Ek resimleri yükle
+      const uploadedExtraImages = [...keptImages];
+      for (let i = 0; i < extraImageFiles.length; i++) {
+        const imgFile = extraImageFiles[i];
+        const imgFd = new FormData(); imgFd.append('file', imgFile);
+        const imgRes = await fetch('/api/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') }, body: imgFd });
+        const imgData = await imgRes.json();
+        if (imgRes.ok && imgData.url) uploadedExtraImages.push(imgData.url);
+      }
+
       if (existing) {
-        await api('/forum/' + existing.slug, { method: 'PUT', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover' }) });
+        await api('/forum/' + existing.slug, { method: 'PUT', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover', images: uploadedExtraImages }) });
         toast('Konu güncellendi');
       } else {
-        const f = await api('/forums', { method: 'POST', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover' }) });
+        const f = await api('/forums', { method: 'POST', body: JSON.stringify({ title, content, banner_image, allow_comments: $('#fm-comments').checked, tagIds, customTags, banner_fit: document.querySelector('[name="fm-fit"]:checked')?.value || 'cover', images: uploadedExtraImages }) });
         toast('Konu oluşturuldu');
         hideModal();
         navigate('/forum/' + f.slug);
@@ -729,6 +781,14 @@ async function renderForumDetail(app, slug) {
           style="object-fit:${forum.banner_fit === 'contain' ? 'contain' : forum.banner_fit === 'original' ? 'none;height:auto;aspect-ratio:unset;max-width:100%' : 'cover'}" />
       </div>` : ''}
       <div class="forum-detail-content">${renderContent(forum.content)}</div>
+      ${(() => {
+        const imgs = (() => { try { return JSON.parse(forum.images || '[]'); } catch { return []; } })();
+        if (!imgs.length) return '';
+        return `<div class="forum-images-gallery">${imgs.map(url => `
+          <a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" class="forum-gallery-item">
+            <img src="${escHtml(url)}" alt="" loading="lazy" />
+          </a>`).join('')}</div>`;
+      })()}
       ${(() => {
         const sTags = Array.isArray(forum.system_tags) ? forum.system_tags : (typeof forum.system_tags === 'string' ? (() => { try { return JSON.parse(forum.system_tags); } catch { return []; } })() : []);
         const cTags = forum.custom_tags ? forum.custom_tags.split(',').map(t => t.trim()).filter(Boolean) : [];
