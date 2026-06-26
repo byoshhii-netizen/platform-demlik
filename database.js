@@ -465,6 +465,51 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_video_comments_video_id ON video_comments(video_id);
 
     ALTER TABLE dm_messages ADD COLUMN IF NOT EXISTS shared_video_id BIGINT;
+
+    CREATE TABLE IF NOT EXISTS photo_posts (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      title TEXT DEFAULT '',
+      image_url TEXT NOT NULL,
+      like_count INTEGER DEFAULT 0,
+      comment_count INTEGER DEFAULT 0,
+      slug TEXT UNIQUE NOT NULL,
+      status TEXT DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS photo_likes (
+      id BIGSERIAL PRIMARY KEY,
+      photo_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      UNIQUE(photo_id, user_id),
+      FOREIGN KEY(photo_id) REFERENCES photo_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS photo_comments (
+      id BIGSERIAL PRIMARY KEY,
+      photo_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      content TEXT NOT NULL,
+      like_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW(),
+      FOREIGN KEY(photo_id) REFERENCES photo_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS photo_comment_likes (
+      id BIGSERIAL PRIMARY KEY,
+      comment_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      UNIQUE(comment_id, user_id),
+      FOREIGN KEY(comment_id) REFERENCES photo_comments(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_photo_posts_created_at ON photo_posts(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_photo_posts_user_id ON photo_posts(user_id);
   `);
 
   // Seed default levels

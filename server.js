@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -1759,16 +1759,16 @@ app.get('/api/music-rules', async (req, res) => {
 });
 
 // SEO route'ları müzik için
-app.get('/muzikler', (req, res) => res.send(injectMeta('Müzikler – Demlik', 'Demlik müzik platformu', `${SITE_URL}/muzikler`, '')));
+app.get('/muzikler', (req, res) => sendHtml(res, injectMeta('Müzikler – Demlik', 'Demlik müzik platformu', `${SITE_URL}/muzikler`, '')));
 app.get('/muzik/:slug', async (req, res) => {
   const { rows } = await query('SELECT * FROM songs WHERE slug=$1', [req.params.slug]);
   if (!rows.length) return res.sendFile(path.join(__dirname, 'public', 'index.html'));
   const s = rows[0];
-  res.send(injectMeta(`${s.title} – ${s.artist_name} | Demlik`, `${s.artist_name} - ${s.title}`, `${SITE_URL}/muzik/${s.slug}`, s.cover_url));
+  sendHtml(res, injectMeta(`${s.title} – ${s.artist_name} | Demlik`, `${s.artist_name} - ${s.title}`, `${SITE_URL}/muzik/${s.slug}`, s.cover_url));
 });
-app.get('/artist-basvuru', (req, res) => res.send(injectMeta('Artist Başvurusu – Demlik', 'Demlik artist rozetine başvur', `${SITE_URL}/artist-basvuru`, '')));
-app.get('/artist-panel', (req, res) => res.send(injectMeta('Artist Panel – Demlik', 'Şarkı yükle ve yönet', `${SITE_URL}/artist-panel`, '')));
-app.get('/sarki-yukle', (req, res) => res.send(injectMeta('Şarkı Paylaş – Demlik', 'Başkasının şarkısını topluluğa paylaş', `${SITE_URL}/sarki-yukle`, '')));
+app.get('/artist-basvuru', (req, res) => sendHtml(res, injectMeta('Artist Başvurusu – Demlik', 'Demlik artist rozetine başvur', `${SITE_URL}/artist-basvuru`, '')));
+app.get('/artist-panel', (req, res) => sendHtml(res, injectMeta('Artist Panel – Demlik', 'Şarkı yükle ve yönet', `${SITE_URL}/artist-panel`, '')));
+app.get('/sarki-yukle', (req, res) => sendHtml(res, injectMeta('Şarkı Paylaş – Demlik', 'Başkasının şarkısını topluluğa paylaş', `${SITE_URL}/sarki-yukle`, '')));
 
 // ===== ADMIN YETKİ SİSTEMİ =====
 app.get('/api/admin/permissions/:userId', adminMiddleware, async (req, res) => {
@@ -2048,20 +2048,25 @@ function injectMeta(title, desc, url, imageUrl) {
   return html.replace('<title>Demlik</title>', meta);
 }
 
-app.get('/giris', (req, res) => res.send(injectMeta('Giriş – Demlik', 'Demlik hesabına giriş yap.', `${SITE_URL}/giris`, '')));
-app.get('/kayit', (req, res) => res.send(injectMeta('Kayıt Ol – Demlik', "Demlik'e ücretsiz kaydol.", `${SITE_URL}/kayit`, '')));
+function sendHtml(res, html) {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+}
+
+app.get('/giris', (req, res) => sendHtml(res, injectMeta('Giriş – Demlik', 'Demlik hesabına giriş yap.', `${SITE_URL}/giris`, '')));
+app.get('/kayit', (req, res) => sendHtml(res, injectMeta('Kayıt Ol – Demlik', "Demlik'e ücretsiz kaydol.", `${SITE_URL}/kayit`, '')));
 app.get('/forum', (req, res) => {
   const tag = req.query.tag || '';
-  res.send(injectMeta(tag ? `${tag} Konuları – Demlik` : 'Konular – Demlik',
+  sendHtml(res, injectMeta(tag ? `${tag} Konuları – Demlik` : 'Konular – Demlik',
     tag ? `Demlik'te ${tag} etiketli konular.` : 'Demlik topluluğunun konularını keşfet.',
     `${SITE_URL}/forum${tag ? '?tag='+encodeURIComponent(tag) : ''}`, ''));
 });
-app.get('/kitaplar', (req, res) => res.send(injectMeta('E-Kitaplar – Demlik', "Demlik yazarlarının e-kitaplarını oku.", `${SITE_URL}/kitaplar`, '')));
-app.get('/gruplar', (req, res) => res.send(injectMeta('Gruplar – Demlik', "Demlik'teki gruplara katıl.", `${SITE_URL}/gruplar`, '')));
-app.get('/ayarlar', (req, res) => res.send(injectMeta('Ayarlar – Demlik', 'Hesap ayarlarını düzenle.', `${SITE_URL}/ayarlar`, '')));
-app.get('/mesajlar', (req, res) => res.send(injectMeta('Mesajlar – Demlik', 'Özel mesajlarınız.', `${SITE_URL}/mesajlar`, '')));
-app.get('/mesajlar/:username', (req, res) => res.send(injectMeta('Mesajlar – Demlik', 'Özel mesajlarınız.', `${SITE_URL}/mesajlar/${req.params.username}`, '')));
-app.get('/arkadaslar', (req, res) => res.send(injectMeta('Arkadaşlar – Demlik', 'Arkadaş listesi.', `${SITE_URL}/arkadaslar`, '')));
+app.get('/kitaplar', (req, res) => sendHtml(res, injectMeta('E-Kitaplar – Demlik', "Demlik yazarlarının e-kitaplarını oku.", `${SITE_URL}/kitaplar`, '')));
+app.get('/gruplar', (req, res) => sendHtml(res, injectMeta('Gruplar – Demlik', "Demlik'teki gruplara katıl.", `${SITE_URL}/gruplar`, '')));
+app.get('/ayarlar', (req, res) => sendHtml(res, injectMeta('Ayarlar – Demlik', 'Hesap ayarlarını düzenle.', `${SITE_URL}/ayarlar`, '')));
+app.get('/mesajlar', (req, res) => sendHtml(res, injectMeta('Mesajlar – Demlik', 'Özel mesajlarınız.', `${SITE_URL}/mesajlar`, '')));
+app.get('/mesajlar/:username', (req, res) => sendHtml(res, injectMeta('Mesajlar – Demlik', 'Özel mesajlarınız.', `${SITE_URL}/mesajlar/${req.params.username}`, '')));
+app.get('/arkadaslar', (req, res) => sendHtml(res, injectMeta('Arkadaşlar – Demlik', 'Arkadaş listesi.', `${SITE_URL}/arkadaslar`, '')));
 
 app.get('/forum/:slug', async (req, res) => {
   const { rows } = await query('SELECT * FROM forums WHERE slug=$1', [req.params.slug]);
@@ -2754,13 +2759,140 @@ app.delete('/api/admin/videos/:id', adminMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ===== FOTOĞRAF POSTS =====
+app.get('/api/photos', optionalAuth, async (req, res) => {
+  const uid = req.user?.id || null;
+  const q = uid
+    ? 'SELECT p.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.is_admin, (SELECT 1 FROM photo_likes WHERE photo_id=p.id AND user_id=$1) IS NOT NULL as liked_by_me FROM photo_posts p JOIN users u ON p.user_id=u.id WHERE p.status='active' ORDER BY p.created_at DESC LIMIT 60'
+    : 'SELECT p.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.is_admin, false as liked_by_me FROM photo_posts p JOIN users u ON p.user_id=u.id WHERE p.status='active' ORDER BY p.created_at DESC LIMIT 60';
+  const { rows } = await query(q, uid ? [uid] : []);
+  res.json(rows);
+});
+
+app.get('/api/photos/recent', optionalAuth, async (req, res) => {
+  const { rows } = await query('SELECT p.*, u.username, u.avatar FROM photo_posts p JOIN users u ON p.user_id=u.id WHERE p.status='active' ORDER BY p.created_at DESC LIMIT 20');
+  res.json(rows);
+});
+
+app.get('/api/photo/:slug', optionalAuth, async (req, res) => {
+  const uid = req.user?.id || null;
+  const q = uid
+    ? 'SELECT p.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.is_admin, (SELECT 1 FROM photo_likes WHERE photo_id=p.id AND user_id=$1) IS NOT NULL as liked_by_me FROM photo_posts p JOIN users u ON p.user_id=u.id WHERE p.slug=$2 AND p.status='active''
+    : 'SELECT p.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.is_admin, false as liked_by_me FROM photo_posts p JOIN users u ON p.user_id=u.id WHERE p.slug=$1 AND p.status='active'';
+  const { rows } = await query(q, uid ? [uid, req.params.slug] : [req.params.slug]);
+  if (!rows.length) return res.status(404).json({ error: 'Fotoğraf bulunamadı' });
+  res.json(rows[0]);
+});
+
+app.post('/api/photos', authMiddleware, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Resim zorunlu' });
+    const title = (req.body.title || '').trim().substring(0, 200);
+    const imageUrl = await handleUpload(req.file);
+    const { v4: uuid4 } = require('uuid');
+    const slug = uuid4();
+    const { rows } = await query(
+      'INSERT INTO photo_posts (user_id, title, image_url, slug) VALUES ($1,$2,$3,$4) RETURNING *',
+      [req.user.id, title, imageUrl, slug]
+    );
+    await logAction(req.user.username, 'create_photo', slug);
+    res.json(rows[0]);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+app.post('/api/photo/:slug/like', authMiddleware, async (req, res) => {
+  const { rows: p } = await query('SELECT id FROM photo_posts WHERE slug=$1', [req.params.slug]);
+  if (!p.length) return res.status(404).json({ error: 'Bulunamadı' });
+  const pid = p[0].id;
+  const { rows: ex } = await query('SELECT id FROM photo_likes WHERE photo_id=$1 AND user_id=$2', [pid, req.user.id]);
+  if (ex.length) {
+    await query('DELETE FROM photo_likes WHERE photo_id=$1 AND user_id=$2', [pid, req.user.id]);
+    await query('UPDATE photo_posts SET like_count=GREATEST(0,like_count-1) WHERE id=$1', [pid]);
+    res.json({ liked: false });
+  } else {
+    await query('INSERT INTO photo_likes (photo_id, user_id) VALUES ($1,$2)', [pid, req.user.id]);
+    await query('UPDATE photo_posts SET like_count=like_count+1 WHERE id=$1', [pid]);
+    res.json({ liked: true });
+  }
+});
+
+app.get('/api/photo/:slug/comments', optionalAuth, async (req, res) => {
+  const { rows: p } = await query('SELECT id FROM photo_posts WHERE slug=$1', [req.params.slug]);
+  if (!p.length) return res.status(404).json({ error: 'Bulunamadı' });
+  const uid = req.user?.id || null;
+  const q = uid
+    ? 'SELECT c.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.is_admin, (SELECT 1 FROM photo_comment_likes WHERE comment_id=c.id AND user_id=$2) IS NOT NULL as liked_by_me FROM photo_comments c JOIN users u ON c.user_id=u.id WHERE c.photo_id=$1 ORDER BY c.created_at ASC'
+    : 'SELECT c.*, u.username, u.avatar, u.name_color, u.is_vip, u.is_plus, u.is_admin, false as liked_by_me FROM photo_comments c JOIN users u ON c.user_id=u.id WHERE c.photo_id=$1 ORDER BY c.created_at ASC';
+  const { rows } = await query(q, uid ? [p[0].id, uid] : [p[0].id]);
+  res.json(rows);
+});
+
+app.post('/api/photo/:slug/comments', authMiddleware, async (req, res) => {
+  const { rows: p } = await query('SELECT id FROM photo_posts WHERE slug=$1', [req.params.slug]);
+  if (!p.length) return res.status(404).json({ error: 'Bulunamadı' });
+  const { content } = req.body;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'İçerik boş olamaz' });
+  const { rows } = await query(
+    'INSERT INTO photo_comments (photo_id, user_id, content) VALUES ($1,$2,$3) RETURNING *',
+    [p[0].id, req.user.id, content.trim()]
+  );
+  await query('UPDATE photo_posts SET comment_count=comment_count+1 WHERE id=$1', [p[0].id]);
+  const { rows: u } = await query('SELECT username, avatar, name_color, is_vip, is_plus, is_admin FROM users WHERE id=$1', [req.user.id]);
+  res.json({ ...rows[0], ...u[0] });
+});
+
+app.delete('/api/photo/:slug/comments/:id', authMiddleware, async (req, res) => {
+  const { rows: p } = await query('SELECT id FROM photo_posts WHERE slug=$1', [req.params.slug]);
+  if (!p.length) return res.status(404).json({ error: 'Bulunamadı' });
+  const { rows: comm } = await query('SELECT * FROM photo_comments WHERE id=$1 AND photo_id=$2', [req.params.id, p[0].id]);
+  if (!comm.length) return res.status(404).json({ error: 'Yorum bulunamadı' });
+  if (comm[0].user_id != req.user.id && !req.user.is_admin) return res.status(403).json({ error: 'Yetki yok' });
+  await query('DELETE FROM photo_comments WHERE id=$1', [req.params.id]);
+  await query('UPDATE photo_posts SET comment_count=GREATEST(0, comment_count-1) WHERE id=$1', [p[0].id]);
+  res.json({ ok: true });
+});
+
+app.post('/api/photo/:slug/comment/:cid/like', authMiddleware, async (req, res) => {
+  const { rows: ex } = await query('SELECT id FROM photo_comment_likes WHERE comment_id=$1 AND user_id=$2', [req.params.cid, req.user.id]);
+  if (ex.length) {
+    await query('DELETE FROM photo_comment_likes WHERE comment_id=$1 AND user_id=$2', [req.params.cid, req.user.id]);
+    await query('UPDATE photo_comments SET like_count=GREATEST(0,like_count-1) WHERE id=$1', [req.params.cid]);
+    res.json({ liked: false });
+  } else {
+    await query('INSERT INTO photo_comment_likes (comment_id, user_id) VALUES ($1,$2)', [req.params.cid, req.user.id]);
+    await query('UPDATE photo_comments SET like_count=like_count+1 WHERE id=$1', [req.params.cid]);
+    res.json({ liked: true });
+  }
+});
+
+app.delete('/api/photo/:slug', authMiddleware, async (req, res) => {
+  const { rows } = await query('SELECT * FROM photo_posts WHERE slug=$1', [req.params.slug]);
+  if (!rows.length) return res.status(404).json({ error: 'Bulunamadı' });
+  if (rows[0].user_id != req.user.id && !req.user.is_admin) return res.status(403).json({ error: 'Yetki yok' });
+  await query('UPDATE photo_posts SET status=$1 WHERE id=$2', ['deleted', rows[0].id]);
+  res.json({ ok: true });
+});
+
+app.get('/api/users/:username/photos', optionalAuth, async (req, res) => {
+  const { rows: u } = await query('SELECT id FROM users WHERE username=$1', [req.params.username]);
+  if (!u.length) return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+  const { rows } = await query(
+    'SELECT p.*, u.username, u.avatar FROM photo_posts p JOIN users u ON p.user_id=u.id WHERE p.user_id=$1 AND p.status='active' ORDER BY p.created_at DESC LIMIT 50',
+    [u[0].id]
+  );
+  res.json(rows);
+});
+
+app.get('/fotograflar', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/fotograf/:slug', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
 // SEO inject for /videolar
-app.get('/videolar', (req, res) => res.send(injectMeta('Videolar – Demlik', 'Kısa videolar keşfet ve paylaş', `${SITE_URL}/videolar`, '')));
+app.get('/videolar', (req, res) => sendHtml(res, injectMeta('Videolar – Demlik', 'Kısa videolar keşfet ve paylaş', `${SITE_URL}/videolar`, '')));
 app.get('/video/:slug', async (req, res) => {
   const { rows } = await query('SELECT * FROM videos WHERE slug=$1', [req.params.slug]);
   if (!rows.length) return res.sendFile(path.join(__dirname, 'public', 'index.html'));
   const v = rows[0];
-  res.send(injectMeta(
+  sendHtml(res, injectMeta(
     `${v.title || 'Video'} – Demlik`,
     v.description ? v.description.substring(0, 160) : 'Demlik\'te video',
     `${SITE_URL}/video/${v.slug}`,
