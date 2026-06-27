@@ -368,6 +368,32 @@ document.addEventListener('click', e => {
   if (mobNewGroup) { $('#mobile-menu').classList.add('hidden'); navigate('/gruplar'); setTimeout(() => showNewGroupModal(), 100); }
 });
 
+async function loadHomeVideos() {
+  const grid = document.getElementById('home-videos-grid');
+  if (!grid) return;
+  try {
+    const videos = await api('/videos?limit=12');
+    if (!videos.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Henuz video yok.</p></div>'; return; }
+    grid.innerHTML = videos.map(v => `<div class="reals-home-item" onclick="navigate('/video/${v.slug}')" style="cursor:pointer;background:var(--bg-card);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+      ${v.thumbnail_url ? `<img src="${v.thumbnail_url}" style="width:100%;aspect-ratio:16/9;object-fit:cover" />` : `<div style="width:100%;aspect-ratio:16/9;background:var(--bg-card2);display:flex;align-items:center;justify-content:center"><i class="fas fa-play-circle" style="font-size:40px;color:var(--accent-red)"></i></div>`}
+      <div style="padding:8px 10px"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(v.title||'Video')}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escHtml(v.username||'')} · ${v.view_count||0} goruntulenme</div></div></div>`).join('');
+  } catch { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Yuklenemedi.</p></div>'; }
+}
+
+async function loadHomeMusicList() {
+  const grid = document.getElementById('home-music-grid');
+  if (!grid) return;
+  try {
+    const songs = await api('/songs');
+    if (!songs.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Henuz muzik yok.</p></div>'; return; }
+    grid.innerHTML = songs.slice(0,12).map(s => `<div class="music-card-mini" onclick="navigate('/muzik/${s.slug}')" style="cursor:pointer;background:var(--bg-card);border-radius:10px;overflow:hidden;border:1px solid var(--border);display:flex;gap:10px;padding:10px;align-items:center">
+      ${s.cover_url ? `<img src="${s.cover_url}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;flex-shrink:0" />` : `<div style="width:48px;height:48px;border-radius:6px;background:var(--bg-card2);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-music" style="color:var(--accent-red)"></i></div>`}
+      <div style="min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(s.title)}</div>
+      <div style="font-size:11px;color:var(--text-muted)">${escHtml(s.artist_name)}</div></div></div>`).join('');
+  } catch { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Yuklenemedi.</p></div>'; }
+}
+
 async function loadHomeReals() {
   const grid = document.getElementById('home-reals-grid');
   if (!grid) return;
@@ -384,13 +410,21 @@ async function loadHomeReals() {
 async function renderHome(app) {
   document.title = 'TeaTube';
   updatePageMeta('TeaTube', 'Video izle, muzik dinle, sohbet et!', '');
-  const urlTab = new URLSearchParams(location.search).get('tab') || 'konular';
+  const urlTab = new URLSearchParams(location.search).get('tab') || 'videolar';
   app.innerHTML = `
     <div class="container page">
       <div class="home-tabs-bar">
-        <button class="home-tab${urlTab==='konular'?' active':''}" data-tab="konular"><i class="fas fa-comments"></i> Konular</button>
-        <button class="home-tab${urlTab==='reals'?' active':''}" data-tab="reals"><i class="fas fa-play-circle"></i> Reals</button>
-        <button class="home-tab${urlTab==='fotograflar'?' active':''}" data-tab="fotograflar"><i class="fas fa-images"></i> Fotograflar</button>
+        <button class="home-tab${urlTab==='videolar'?' active':''}" data-tab="videolar">Videolar</button>
+        <button class="home-tab${urlTab==='konular'?' active':''}" data-tab="konular">Konular</button>
+        <button class="home-tab${urlTab==='reals'?' active':''}" data-tab="reals">Reals</button>
+        <button class="home-tab${urlTab==='muzikler'?' active':''}" data-tab="muzikler">Muzikler</button>
+        <button class="home-tab${urlTab==='fotograflar'?' active':''}" data-tab="fotograflar">Fotograflar</button>
+      </div>
+      <div id="home-tab-videolar" class="home-tab-content" style="display:${urlTab==='videolar'?'block':'none'}">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+          <a href="/videolar" data-link class="btn btn-ghost btn-sm">Tumunu Gor</a>
+        </div>
+        <div id="home-videos-grid" class="reals-grid-home"><div class="loading-center"><div class="spinner"></div></div></div>
       </div>
       <div id="home-tab-konular" class="home-tab-content" style="display:${urlTab==='konular'?'block':'none'}">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
@@ -405,6 +439,12 @@ async function renderHome(app) {
           <a href="/videolar" data-link class="btn btn-ghost btn-sm">Tumunu Gor <i class="fas fa-arrow-right"></i></a>
         </div>
         <div id="home-reals-grid" class="reals-grid-home"><div class="loading-center"><div class="spinner"></div></div></div>
+      </div>
+      <div id="home-tab-muzikler" class="home-tab-content" style="display:${urlTab==='muzikler'?'block':'none'}">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+          <a href="/muzikler" data-link class="btn btn-ghost btn-sm">Tumunu Gor</a>
+        </div>
+        <div id="home-music-grid" class="reals-grid-home"><div class="loading-center"><div class="spinner"></div></div></div>
       </div>
       <div id="home-tab-fotograflar" class="home-tab-content" style="display:${urlTab==='fotograflar'?'block':'none'}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -422,16 +462,20 @@ async function renderHome(app) {
       document.querySelectorAll('.home-tab-content').forEach(c => c.style.display = 'none');
       document.getElementById('home-tab-' + tab).style.display = 'block';
       history.replaceState(null, '', tab === 'konular' ? '/' : '/?tab=' + tab);
+      if (tab === 'videolar' && !document.querySelector('#home-videos-grid .reals-home-item')) loadHomeVideos();
       if (tab === 'reals' && !document.querySelector('.reals-home-item')) loadHomeReals();
       if (tab === 'fotograflar' && !document.querySelector('.photo-card')) loadHomePhotos();
+      if (tab === 'muzikler' && !document.querySelector('#home-music-grid .music-card-mini')) loadHomeMusicList();
     });
   });
   if (currentUser) {
     document.getElementById('home-new-forum-btn')?.addEventListener('click', () => showNewForumModal());
     document.getElementById('home-new-photo-btn')?.addEventListener('click', () => showNewPhotoModal());
   }
-  if (urlTab === 'reals') loadHomeReals();
+  if (urlTab === 'videolar') loadHomeVideos();
+  else if (urlTab === 'reals') loadHomeReals();
   else if (urlTab === 'fotograflar') loadHomePhotos();
+  else if (urlTab === 'muzikler') loadHomeMusicList();
   let allForums = [];
   try {
     allForums = await api('/forums');
