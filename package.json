@@ -1,7 +1,7 @@
-{
-  "name": "demlik-forum",
+﻿{
+  "name": "teatube-platform",
   "version": "2.0.0",
-  "description": "Demlik Platform",
+  "description": "TeaTube Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -1570,7 +1570,7 @@ async function renderSettings(main) {
       <div class="card">
         <div class="card-header"><span><i class="fas fa-palette" style="color:var(--red2);margin-right:8px"></i>Genel</span></div>
         <div class="card-body">
-          <div class="form-group"><label>Site Adı</label><input id="s-sitename" value="${escHtml(settings['site_name']||'Demlik')}" /></div>
+          <div class="form-group"><label>Site Adı</label><input id="s-sitename" value="${escHtml(settings['site_name']||'TeaTube')}" /></div>
           <div class="form-group">
             <label>Site Logosu</label>
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">

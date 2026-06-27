@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg-primary: #080808;
   --bg-secondary: #111111;
   --bg-card: #1a1a1a;
@@ -176,6 +176,9 @@ label { display: block; font-size: 13px; font-weight: 500; color: var(--text-sec
 .mobile-nav-link { padding: 10px 12px; border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 15px; }
 .mobile-nav-link:hover { color: var(--text-primary); background: rgba(220,38,38,0.08); }
 .nav-mobile-toggle { display: none; background: none; border: none; color: var(--text-primary); font-size: 20px; }
+.nav-theme-toggle { color: var(--text-secondary); transition: color 0.2s, transform 0.3s; }
+.nav-theme-toggle:hover { color: var(--accent-red); transform: rotate(20deg); }
+.nav-hamburger:hover { background: rgba(255,255,255,0.08) !important; }
 @media (max-width: 768px) {
   .nav-links { display: none; }
   .nav-mobile-toggle { display: block; margin-left: auto; }
@@ -617,9 +620,6 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   word-break: break-word;
   overflow-wrap: anywhere;
   width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
   box-sizing: border-box;
   overflow-x: hidden;
 }
@@ -1717,11 +1717,293 @@ pre, .page-reader-content { font-family: 'Inter', sans-serif; }
   display: flex;
   align-items: center;
   gap: 6px;
+  transition: color 0.15s, border-color 0.15s;
 }
 .home-tab:hover { color: var(--text-primary); }
 .home-tab.active { color: var(--accent-red2); border-bottom-color: var(--accent-red2); }
 
 @media (max-width: 600px) {
   .photos-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .home-tab { padding: 8px 12px; font-size: 12px; }
+  .home-tab { padding: 8px 12px; font-size: 12px;   transition: color 0.15s, border-color 0.15s;
+}
+}
+
+/* ===== APP SHELL + SOL SIDEBAR (TeaTube stili) ===== */
+.app-shell {
+  display: flex;
+  min-height: calc(100vh - 60px);
+  position: relative;
+}
+
+.left-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 60px;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.25s cubic-bezier(.4,0,.2,1);
+  z-index: 50;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.left-sidebar.collapsed { width: 72px; }
+
+/* Mini logo (collapsed modda) */
+.sidebar-logo-mini {
+  display: none;
+  justify-content: center;
+  padding: 12px 0 8px;
+}
+.sidebar-logo-mini img { width: 32px; height: 32px; object-fit: contain; }
+.left-sidebar.collapsed .sidebar-logo-mini { display: flex; }
+
+/* Toggle butonu - KALDIRILDI, hamburger navbar'da */
+.sidebar-toggle-btn { display: none; }
+
+/* Collapsed gizlemeler */
+.left-sidebar.collapsed .sidebar-label,
+.left-sidebar.collapsed .sidebar-section-label,
+.left-sidebar.collapsed .sidebar-user-card,
+.left-sidebar.collapsed .sidebar-badge {
+  display: none;
+}
+.left-sidebar.collapsed .sidebar-nav-item {
+  justify-content: center;
+  padding: 12px 0;
+  margin: 2px 4px;
+  border-radius: 10px;
+}
+.left-sidebar.collapsed .sidebar-nav-icon {
+  margin: 0;
+  font-size: 18px;
+  width: auto;
+}
+.left-sidebar.collapsed .sidebar-logo-mini { display: flex; }
+
+.sidebar-inner { padding: 8px 0 80px; }
+
+/* Bölüm başlıkları */
+.sidebar-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 16px 20px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.2s;
+}
+
+/* Menü öğeleri — TeaTube guide-item stili */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 20px;
+  margin: 1px 0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 0;
+  transition: background 0.15s, color 0.15s;
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  animation: sidebarItemIn 0.25s ease forwards;
+  opacity: 0;
+}
+.sidebar-nav-item:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+}
+.sidebar-nav-item.active {
+  background: rgba(220,38,38,0.12);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent-red);
+}
+.sidebar-nav-icon {
+  width: 20px;
+  text-align: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+.sidebar-nav-item.active .sidebar-nav-icon,
+.sidebar-nav-item:hover .sidebar-nav-icon { color: var(--accent-red2); }
+.sidebar-label { flex: 1; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.2s; }
+.sidebar-badge {
+  background: var(--accent-red);
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+/* Sidebar bölüm ayırıcı */
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+@keyframes sidebarItemIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.sidebar-nav-item:nth-child(1)  { animation-delay: 0.02s; }
+.sidebar-nav-item:nth-child(2)  { animation-delay: 0.04s; }
+.sidebar-nav-item:nth-child(3)  { animation-delay: 0.06s; }
+.sidebar-nav-item:nth-child(4)  { animation-delay: 0.08s; }
+.sidebar-nav-item:nth-child(5)  { animation-delay: 0.10s; }
+.sidebar-nav-item:nth-child(6)  { animation-delay: 0.12s; }
+.sidebar-nav-item:nth-child(7)  { animation-delay: 0.14s; }
+.sidebar-nav-item:nth-child(8)  { animation-delay: 0.16s; }
+.sidebar-nav-item:nth-child(n+9){ animation-delay: 0.18s; }
+.left-sidebar.collapsed .sidebar-nav-item { animation: none; opacity: 1; }
+
+.app-main { flex: 1; min-width: 0; overflow-x: hidden; }
+
+/* Kullanıcı profil kartı */
+.sidebar-user-card {
+  margin: 8px 12px 4px;
+  padding: 10px 12px;
+  background: rgba(220,38,38,0.07);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: background 0.18s;
+  overflow: hidden;
+}
+.sidebar-user-card:hover { background: rgba(220,38,38,0.13); }
+.sidebar-user-info { min-width: 0; flex: 1; overflow: hidden; }
+.sidebar-user-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-account-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.sat-bireysel { background: rgba(88,101,242,0.15); color: #7c87f5; }
+.sat-sirket   { background: rgba(249,115,22,0.15); color: #fb923c; }
+.sat-sanatci  { background: rgba(168,85,247,0.15); color: #c084fc; }
+
+/* Hesap tipi seçim ekranı */
+.account-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 12px;
+  margin: 20px 0;
+}
+.account-type-card {
+  background: var(--bg-card2);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.account-type-card:hover { border-color: var(--accent-red); transform: translateY(-2px); }
+.account-type-card.selected { border-color: var(--accent-red); background: rgba(220,38,38,0.08); }
+.account-type-icon { font-size: 28px; margin-bottom: 8px; }
+.account-type-name { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.account-type-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+/* Responsive: küçük ekranda sidebar gizle */
+@media (max-width: 900px) {
+  .left-sidebar {
+    position: fixed;
+    left: 0;
+    top: 60px;
+    height: calc(100vh - 60px);
+    transform: translateX(-100%);
+    width: 220px !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  .left-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .left-sidebar.collapsed {
+    width: 220px !important;
+  }
+  .left-sidebar.collapsed .sidebar-label,
+  .left-sidebar.collapsed .sidebar-section-label,
+  .left-sidebar.collapsed .sidebar-badge {
+    opacity: 1;
+    pointer-events: auto;
+    width: auto;
+  }
+  .left-sidebar.collapsed .sidebar-nav-item {
+    justify-content: flex-start;
+    padding: 9px 14px 9px 16px;
+  }
+  .sidebar-toggle-btn { display: none; }
+  .app-main { width: 100%; }
+}
+
+.reals-grid-home { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+
+/* ===== ACIK TEMA DUZENLEMELERI ===== */
+body[data-theme="light"] input,
+body[data-theme="light"] textarea,
+body[data-theme="light"] select {
+  background: #fff;
+  border-color: rgba(0,0,0,0.2);
+  color: #1a1a1a;
+}
+body[data-theme="light"] .card,
+body[data-theme="light"] .forum-card,
+body[data-theme="light"] .book-card {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+body[data-theme="light"] .left-sidebar {
+  background: #f0f2f5;
+  border-right-color: rgba(0,0,0,0.12);
+}
+body[data-theme="light"] .sidebar-nav-item:hover {
+  background: rgba(0,0,0,0.05);
+}
+body[data-theme="light"] .sidebar-nav-item.active {
+  background: rgba(220,38,38,0.08);
+}
+body[data-theme="light"] .navbar {
+  border-bottom-color: rgba(0,0,0,0.12);
+}
+body[data-theme^="light"] .dropdown-menu {
+  background: #fff;
+  border-color: rgba(0,0,0,0.12);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }

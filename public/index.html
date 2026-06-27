@@ -1,77 +1,48 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="index, follow" />
   <meta name="google-site-verification" content="RhEBvgyP9rmgEGTcseTTc3JFSp4Yc5IbS7b7lsil-y4" />
-  <title>Demlik</title>
-  <meta name="description" content="Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur." />
+  <title>TeaTube – Video İzle, Müzik Dinle, Sohbet Et</title>
+  <meta name="description" content="TeaTube – Video izle, müzik dinle, fotoğraf paylaş, arkadaşlarınla sohbet et! Türkiye'nin sosyal medya platformu." />
   <link rel="canonical" href="https://demlikforum.up.railway.app" />
 
   <!-- Open Graph -->
-  <meta property="og:site_name" content="Demlik" />
-  <meta property="og:title" content="Demlik – Çay kadar sıcak sohbet ortamı" />
-  <meta property="og:description" content="Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur." />
+  <meta property="og:site_name" content="TeaTube" />
+  <meta property="og:title" content="TeaTube – Video İzle, Müzik Dinle, Sohbet Et" />
+  <meta property="og:description" content="TeaTube – Video izle, müzik dinle, fotoğraf paylaş, arkadaşlarınla sohbet et!" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://demlikforum.up.railway.app" />
-  <meta property="og:image" content="https://demlikforum.up.railway.app/demlik.png" />
+  <meta property="og:image" content="https://demlikforum.up.railway.app/ttlogo.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:locale" content="tr_TR" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Demlik" />
-  <meta name="twitter:description" content="Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur." />
-  <meta name="twitter:image" content="https://demlikforum.up.railway.app/demlik.png" />
+  <meta name="twitter:title" content="TeaTube" />
+  <meta name="twitter:description" content="TeaTube – Video izle, müzik dinle, fotoğraf paylaş, arkadaşlarınla sohbet et!" />
+  <meta name="twitter:image" content="https://demlikforum.up.railway.app/ttlogo.png" />
 
   <!-- Schema.org JSON-LD -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "Demlik",
-    "alternateName": "Demlik – Çay kadar sıcak sohbet ortamı",
+    "name": "TeaTube",
     "url": "https://demlikforum.up.railway.app",
-    "description": "Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur.",
+    "description": "TeaTube – Video izle, müzik dinle, fotoğraf paylaş, sohbet et.",
     "potentialAction": {
       "@type": "SearchAction",
       "target": "https://demlikforum.up.railway.app/forum?q={search_term_string}",
       "query-input": "required name=search_term_string"
-    }
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SiteLinksSearchBox",
-    "url": "https://demlikforum.up.railway.app",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://demlikforum.up.railway.app/forum?q={search_term_string}",
-      "query-input": "required name=search_term_string"
-    }
-  }
-  </script>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "Demlik",
-    "url": "https://demlikforum.up.railway.app",
-    "logo": "https://demlikforum.up.railway.app/demlik.png",
-    "description": "Demlik, insanların dilediklerini yazabilecekleri ve kendi e-kitaplarını oluşturabilecekleri bir sohbet platformudur.",
-    "sameAs": [],
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "contactType": "customer support",
-      "url": "https://demlikforum.up.railway.app/giris"
     }
   }
   </script>
 
-  <link rel="icon" href="/demlik.png" type="image/png" />
+  <link rel="icon" href="/ttlogo.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -84,9 +55,12 @@
   <!-- NAVBAR -->
   <nav class="navbar" id="navbar">
     <div class="nav-container">
+      <button class="nav-hamburger" id="sidebar-toggle-btn" title="Menü" style="background:none;border:none;color:var(--text-primary);font-size:20px;cursor:pointer;padding:6px 10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:background 0.15s">
+        <i class="fas fa-bars"></i>
+      </button>
       <a href="/" data-link class="nav-brand">
-        <img src="/demlik.png" alt="Demlik" style="height:32px;width:32px;object-fit:contain;flex-shrink:0;border-radius:6px" />
-        <span style="font-size:16px;font-weight:800;letter-spacing:2px;color:var(--text-primary);white-space:nowrap">DEMLİK</span>
+        <img src="/ttlogo.png" alt="TeaTube" style="height:32px;width:auto;object-fit:contain;flex-shrink:0;" />
+        <span style="font-size:16px;font-weight:800;letter-spacing:1px;color:var(--text-primary);white-space:nowrap">TeaTube</span>
       </a>
       <div class="nav-links">
         <a href="/" data-link class="nav-link">Ana Sayfa</a>
@@ -133,6 +107,9 @@
           </div>
         </div>
       </div>
+      <button class="btn btn-ghost btn-sm nav-theme-toggle" id="theme-toggle-btn" title="Tema değiştir" onclick="toggleDarkLight()" style="padding:6px 10px;font-size:16px;flex-shrink:0">
+        <i class="fas fa-sun" id="theme-toggle-icon"></i>
+      </button>
       <button class="nav-mobile-toggle" id="mobile-toggle">
         <i class="fas fa-bars"></i>
       </button>
@@ -160,8 +137,22 @@
   <!-- DUYURULAR -->
   <div id="announcements-container"></div>
 
-  <!-- APP -->
-  <div id="app"></div>
+  <!-- APP WRAPPER with left sidebar -->
+  <div class="app-shell" id="app-shell">
+    <!-- SOL MENÜ -->
+    <aside class="left-sidebar" id="left-sidebar">
+      <div class="sidebar-inner">
+        <div class="sidebar-logo-mini">
+          <img src="/ttlogo.png" alt="TeaTube" />
+        </div>
+        <nav class="sidebar-nav" id="sidebar-nav">
+          <!-- Dinamik olarak app.js tarafından doldurulur -->
+        </nav>
+      </div>
+    </aside>
+    <!-- ANA İÇERİK -->
+    <main class="app-main" id="app"></main>
+  </div>
 
   <!-- MODAL -->
   <div class="modal-overlay hidden" id="modal-overlay">
@@ -179,7 +170,7 @@
 
   <!-- FOOTER -->
   <footer id="site-footer" style="text-align:center;padding:20px;font-size:12px;color:#525252;border-top:1px solid rgba(220,38,38,0.1);margin-top:40px">
-    Created By. İsmail DEMİRCAN &nbsp;&#169;&nbsp;Copyright 2026
+    TeaTube &nbsp;&#169;&nbsp;Copyright 2026 — Created By İsmail DEMİRCAN
   </footer>
 
   <!-- MOBİL BOTTOM BAR -->

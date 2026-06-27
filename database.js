@@ -549,10 +549,10 @@ async function initDb() {
   if (kvkkRows.length === 0) {
     await query('INSERT INTO settings (key,value) VALUES ($1,$2)', ['kvkk_text', `KİŞİSEL VERİLERİN KORUNMASI KANUNU (KVKK) AYDINLATMA METNİ
 
-Demlik Forum olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel verilerinizin işlenmesine ilişkin sizi bilgilendirmek isteriz.
+TeaTube olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında kişisel verilerinizin işlenmesine ilişkin sizi bilgilendirmek isteriz.
 
 1. VERİ SORUMLUSU
-Demlik Forum platformu, veri sorumlusu sıfatıyla hareket etmektedir.
+TeaTube platformu, veri sorumlusu sıfatıyla hareket etmektedir.
 
 2. İŞLENEN KİŞİSEL VERİLER
 Kullanıcı adı, e-posta adresi, IP adresi, platform içi içerikleriniz (forum gönderileri, kitap sayfaları, grup mesajları) işlenmektedir.
